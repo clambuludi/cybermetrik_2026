@@ -16,6 +16,7 @@ export interface Section {
   softwareLinks?: Link[],
   helpfulTools?: Link[],
   furtherResources?: Link[],
+  hidden?: boolean,
 }
 
 export type Priority = 'essential' | 'optional' | 'advanced';
@@ -24,6 +25,7 @@ export interface Checklist {
   point: string,
   priority: Priority,
   details: string,
+  hidden?: boolean,
 }
 
 export interface Link {

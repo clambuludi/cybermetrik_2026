@@ -8,8 +8,8 @@ import styles from './psc.module.css';
 export default component$((props: { sections: Section[] }) => {
 
   // Create signals to store the number of items done or ignored per section
-  const completions =  useSignal<number[]>();
-  const done =  useSignal<number[]>();
+  const completions = useSignal<number[]>();
+  const done = useSignal<number[]>();
 
   // Get the IDs of completed and ignore items from local storage
   const [checked] = useLocalStorage('PSC_PROGRESS', {});
@@ -28,12 +28,13 @@ export default component$((props: { sections: Section[] }) => {
 
   // On load (in browser only), calculate and set completion data for sections
   useOnWindow('load', $(async () => {
+    const sections = Array.isArray(props.sections) ? props.sections : [];
     // Percentage completion, per section
-    completions.value = await Promise.all(props.sections.map(section => 
+    completions.value = await Promise.all(sections.map(section =>
       getPercentCompletion(section),
     ));
     // Count of completed items, per section
-    done.value = await Promise.all(props.sections.map(section => 
+    done.value = await Promise.all(sections.map(section =>
       section.checklist.filter(
         (item) => checked.value[item.point.toLowerCase().replace(/ /g, '-')],
       ).length
@@ -44,7 +45,7 @@ export default component$((props: { sections: Section[] }) => {
     <div class={[styles.container, 'grid',
       'mx-auto mt-8 px-4 gap-7', 'xl:px-10 xl:max-w-7xl',
       'transition-all', 'max-w-6xl w-full']}>
-      {props.sections.map((section: Section, index: number) => (                   
+      {(Array.isArray(props.sections) ? props.sections : []).map((section: Section, index: number) => (
         <a key={section.slug}
           href={`/checklist/${section.slug}`}
           class={[
@@ -58,11 +59,11 @@ export default component$((props: { sections: Section[] }) => {
             <Icon icon={section.icon || 'star'} color={section.color} />
             {(done.value && done.value[index]) ? (
               <p class={`text-${section.color}-400 pt-2 pb-0 px-0 mx-0 my-0`}>
-                {done.value[index]}/{section.checklist.length} Done
+                {done.value[index]}/{section.checklist.length} Hecho
               </p>
             ) : (
               <p class={`text-${section.color}-400 pt-2 pb-0 px-0 mx-0 my-0`}>
-                {section.checklist.length} Items
+                {section.checklist.length} Ítems
               </p>
             )}
           </div>
@@ -76,11 +77,11 @@ export default component$((props: { sections: Section[] }) => {
                 class={['radial-progress absolute right-2 top-2 scale-75', `text-${section.color}-400`]}
                 style={`--value:${completions.value[index]}; --size: 2.5rem;`}
                 role="progressbar">
-                  <span class="text-xs">{completions.value[index]}%</span>
+                <span class="text-xs">{completions.value[index]}%</span>
               </div>
             ) : (
               <span class="absolute right-2 top-2 opacity-30 text-xs">
-                Not yet started
+                No iniciado aún
               </span>
             )}
           </div>

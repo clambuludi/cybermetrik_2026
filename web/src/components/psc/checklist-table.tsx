@@ -4,14 +4,13 @@ import { useCSSTransition } from "qwik-transition";
 import Icon from "~/components/core/icon";
 import type { Priority, Section, Checklist } from '../../types/PSC';
 import { marked } from "marked";
-import { useLocalStorage } from "~/hooks/useLocalStorage";
+import { useChecklistSync } from "~/hooks/useChecklistSync";
 import styles from './psc.module.css';
 
 
 export default component$((props: { section: Section }) => {
 
-  const [completed, setCompleted] = useLocalStorage('PSC_PROGRESS', {});
-  const [ignored, setIgnored] = useLocalStorage('PSC_IGNORED', {});
+  const { completed, setCompleted$, ignored, setIgnored$, isSyncing } = useChecklistSync();
 
   const showFilters = useSignal(false);
   const { stage } = useCSSTransition(showFilters, { timeout: 300 });
@@ -45,7 +44,7 @@ export default component$((props: { section: Section }) => {
   };
 
   const generateId = (title: string) => {
-    return title.toLowerCase().replace(/ /g, '-');
+    return title.toLowerCase().replace(/ /g, '-').replace(/[^\w-]/g, '');
   };
 
   const parseMarkdown = (text: string | undefined): string => {
@@ -150,7 +149,8 @@ export default component$((props: { section: Section }) => {
     <div class="flex flex-wrap justify-between items-center">
       <div>
         <progress class="progress w-64" value={percent} max="100"></progress>
-        <p class="text-xs text-center">
+        <p class="text-xs text-center flex items-center justify-center gap-1">
+          {isSyncing.value && <span class="loading loading-spinner loading-xs text-primary"></span>}
           {done} out of {total} ({percent}%)
           complete, {disabled} ignored</p>
       </div>
@@ -271,7 +271,7 @@ export default component$((props: { section: Section }) => {
                   onClick$={() => {
                     const data = completed.value;
                     data[itemId] = !data[itemId];
-                    setCompleted(data);
+                    setCompleted$(data);
                   }}
                 />
                 <label for={`ignore-${itemId}`} class="text-small block opacity-50 mt-2">Ignore</label>
@@ -283,11 +283,11 @@ export default component$((props: { section: Section }) => {
                   onClick$={() => {
                     const ignoredData = ignored.value;
                     ignoredData[itemId] = !ignoredData[itemId];
-                    setIgnored(ignoredData);
+                    setIgnored$(ignoredData);
 
                     const completedData = completed.value;
                     completedData[itemId] = false;
-                    setCompleted(completedData);
+                    setCompleted$(completedData);
                   }}
                 />
               </td>
