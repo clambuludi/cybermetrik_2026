@@ -7,7 +7,9 @@ import { reports, users } from '~/db/schema';
 import { desc, eq } from 'drizzle-orm';
 import { verifyToken, COOKIE_NAME } from '~/utils/auth';
 import type { DocumentHead } from '@builder.io/qwik-city';
-import { generateAdminClientHistoryPDF } from '~/utils/pdf-generator';
+import { generateAdminClientHistoryPDF, generatePDF } from '~/utils/pdf-generator';
+import { useAdminResetHistory } from '~/routes/api/report';
+import Icon from '~/components/core/icon';
 
 export const useClientData = routeLoader$(async ({ cookie, params, redirect }) => {
     // Auth check — admin only
@@ -39,6 +41,7 @@ export default component$(() => {
     const data = useClientData();
     const checklists = useContext(ChecklistContext);
     const nav = useNavigate();
+    const resetHistoryAction = useAdminResetHistory();
     const { client, reports } = data.value;
 
     const formatDate = (d: string | null) => {
@@ -50,6 +53,31 @@ export default component$(() => {
 
     const handleExportPDF = $((client: any, reports: any[]) => {
         generateAdminClientHistoryPDF(client, reports);
+    });
+
+    const handleDownloadDetail = $((report: any) => {
+        if (!report.data) return;
+        try {
+            const parsedData = JSON.parse(report.data);
+            generatePDF({
+                userName: report.userName,
+                sections: checklists?.value || [],
+                checkedItems: parsedData.checkedItems || parsedData,
+                totalProgress: { 
+                    completed: report.completedCount, 
+                    outOf: report.totalCount 
+                }
+            });
+        } catch (e) {
+            console.error('Error downloading detailed report:', e);
+        }
+    });
+
+    const handleResetHistory = $(async () => {
+        if (confirm(`¿Estás SEGURO de que deseas reiniciar TODO el historial de ${client.name}? Esta acción eliminará permanentemente todos sus reportes y su progreso actual. El cliente volverá a Evaluación 1.`)) {
+            await resetHistoryAction.submit({ clientId: client.id });
+            nav('/admin'); // Redirect back to list after reset as safety
+        }
     });
 
     return (
@@ -71,18 +99,23 @@ export default component$(() => {
                     </p>
                     <p class="text-sm opacity-50 mt-2">Registrado el: {formatDate(client.createdAt)}</p>
                 </div>
-                <button 
-                  onClick$={() => handleExportPDF(client, reports)}
-                  class="btn btn-outline btn-primary shadow-lg shadow-cyan-500/10 gap-2"
-                  disabled={reports.length === 0}
-                >
-                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                        <polyline points="7 10 12 15 17 10"></polyline>
-                        <line x1="12" y1="15" x2="12" y2="3"></line>
-                    </svg>
-                    Generar Historial PDF
-                </button>
+                <div class="flex flex-wrap items-center gap-3">
+                    <button 
+                      onClick$={() => handleExportPDF(client, reports)}
+                      class="btn btn-outline btn-primary shadow-lg shadow-cyan-500/10 gap-2"
+                      disabled={reports.length === 0}
+                    >
+                        <Icon icon="download" width={20} height={20} />
+                        Resumen PDF
+                    </button>
+                    <button 
+                      onClick$={handleResetHistory}
+                      class="btn btn-outline btn-error gap-2"
+                    >
+                        <Icon icon="clear" width={20} height={20} />
+                        Reiniciar Historial
+                    </button>
+                </div>
             </div>
 
             <div class="mb-8">
@@ -129,8 +162,18 @@ export default component$(() => {
                                             </div>
                                         </div>
                                         
-                                        <div class="w-full bg-gray-900 rounded-full h-2">
+                                        <div class="w-full bg-gray-900 rounded-full h-2 mb-4">
                                             <div class={`bg-gradient-to-r h-2 rounded-full ${report.score >= 70 ? 'from-green-500 to-green-400' : report.score >= 40 ? 'from-yellow-500 to-yellow-400' : 'from-red-500 to-red-400'}`} style={{ width: `${report.score}%` }}></div>
+                                        </div>
+
+                                        <div class="flex justify-end">
+                                            <button 
+                                                onClick$={() => handleDownloadDetail(report)}
+                                                class="btn btn-ghost btn-xs text-cyan-400 hover:bg-cyan-500/10 gap-2 font-bold"
+                                            >
+                                                <Icon icon="download" width={14} height={14} />
+                                                Descargar Diagnóstico Detallado
+                                            </button>
                                         </div>
                                     </div>
                                 </div>

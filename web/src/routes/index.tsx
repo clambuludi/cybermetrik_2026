@@ -5,6 +5,7 @@ import Hero from "~/components/furniture/hero";
 import SectionLinkGrid from "~/components/psc/section-link-grid";
 import Progress from "~/components/psc/progress";
 import MaturityTrend from '~/components/psc/maturity-trend';
+import ReportHistory from '~/components/psc/report-history';
 import { db } from '~/db';
 import { reports } from '~/db/schema';
 import { desc, eq } from 'drizzle-orm';
@@ -73,6 +74,10 @@ export default component$(() => {
                         sections={checklists?.value || []}
                         showFilter={false}
                         currentProgress={completed.value}
+                    />
+                    <ReportHistory 
+                        reports={reportsData.value || []} 
+                        sections={checklists?.value || []} 
                     />
                 </div>
             )}

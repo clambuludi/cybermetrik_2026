@@ -1,5 +1,7 @@
-import { component$ } from '@builder.io/qwik';
+import { $, component$ } from '@builder.io/qwik';
 import Icon from '~/components/core/icon';
+import { generatePDF } from '~/utils/pdf-generator';
+import type { Sections } from '~/types/PSC';
 
 interface Report {
     id: number;
@@ -8,16 +10,15 @@ interface Report {
     score: number;
     completedCount: number;
     totalCount: number;
+    data?: string; // JSON with checkedItems
 }
 
-export default component$((props: { reports: Report[] }) => {
+export default component$((props: { reports: Report[], sections: Sections }) => {
     const formatDate = (dateStr: string | null) => {
         if (!dateStr) return 'N/A';
-        // SQLite uses "YYYY-MM-DD HH:MM:SS", we need to ensure JS Date can parse it
-        // Adding T makes it more ISO-like
         const isoStr = dateStr.replace(' ', 'T');
         const date = new Date(isoStr);
-        if (isNaN(date.getTime())) return dateStr; // Fallback to raw string
+        if (isNaN(date.getTime())) return dateStr;
         return date.toLocaleString('es-ES', {
             year: 'numeric',
             month: 'short',
@@ -26,6 +27,26 @@ export default component$((props: { reports: Report[] }) => {
             minute: '2-digit'
         });
     };
+
+    const handleDownloadDetail = $((report: Report) => {
+        if (!report.data) return;
+        try {
+            const parsedData = JSON.parse(report.data);
+            // Ensure compatibility with the generatePDF expected structure
+            // We need to map checkedItems and totalProgress
+            generatePDF({
+                userName: report.userName,
+                sections: props.sections,
+                checkedItems: parsedData.checkedItems || parsedData,
+                totalProgress: { 
+                    completed: report.completedCount, 
+                    outOf: report.totalCount 
+                }
+            });
+        } catch (e) {
+            console.error('Error downloading detailed report:', e);
+        }
+    });
 
     return (
         <div class="mt-12 w-full max-w-4xl mx-auto p-6 bg-front rounded-box shadow-lg border border-gray-800/10">
@@ -45,6 +66,7 @@ export default component$((props: { reports: Report[] }) => {
                                 <th>Usuario</th>
                                 <th>Progreso</th>
                                 <th>Ítems</th>
+                                <th class="text-right">Acción</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -59,6 +81,16 @@ export default component$((props: { reports: Report[] }) => {
                                         </div>
                                     </td>
                                     <td class="opacity-70 text-sm">{report.completedCount} / {report.totalCount}</td>
+                                    <td class="text-right">
+                                        <button 
+                                            onClick$={() => handleDownloadDetail(report)}
+                                            class="btn btn-ghost btn-xs text-secondary hover:text-primary gap-1"
+                                            title="Descargar Diagnóstico Completo"
+                                        >
+                                            <Icon icon="download" width={14} height={14} />
+                                            Detalle
+                                        </button>
+                                    </td>
                                 </tr>
                             ))}
                         </tbody>

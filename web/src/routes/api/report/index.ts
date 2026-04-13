@@ -99,3 +99,21 @@ export const useClearHistory = globalAction$(
     }
 );
 
+export const useAdminResetHistory = globalAction$(
+    async ({ clientId }, { cookie }) => {
+        const token = cookie.get(COOKIE_NAME)?.value;
+        if (!token) return { success: false, error: 'No autenticado' };
+        const session = verifyToken(token);
+        if (!session || session.role !== 'admin') return { success: false, error: 'No autorizado' };
+
+        try {
+            await db.delete(reports).where(eq(reports.userId, clientId));
+            return { success: true };
+        } catch (e) {
+            console.error('Error in admin reset history:', e);
+            return { success: false, error: 'Error al reiniciar el historial del cliente' };
+        }
+    },
+    zod$({ clientId: z.number() })
+);
+
