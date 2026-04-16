@@ -7,7 +7,7 @@ import { reports, users } from '~/db/schema';
 import { desc, eq } from 'drizzle-orm';
 import { verifyToken, COOKIE_NAME } from '~/utils/auth';
 import type { DocumentHead } from '@builder.io/qwik-city';
-import { generateAdminClientHistoryPDF, generatePDF } from '~/utils/pdf-generator';
+import { generatePDF } from '~/utils/pdf-generator';
 import { useAdminResetHistory } from '~/routes/api/report';
 import Icon from '~/components/core/icon';
 
@@ -47,18 +47,20 @@ export default component$(() => {
     const formatDate = (d: string | null) => {
         if (!d) return 'N/A';
         return new Date(d.replace(' ', 'T')).toLocaleString('es-ES', { 
-            year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+            year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
+            timeZone: 'America/Guayaquil'
         });
     };
-
-    const handleExportPDF = $((client: any, reports: any[]) => {
-        generateAdminClientHistoryPDF(client, reports);
-    });
 
     const handleDownloadDetail = $((report: any) => {
         if (!report.data) return;
         try {
             const parsedData = JSON.parse(report.data);
+            
+            // Use the average of all reports as the global maturity trend indicator
+            const totalScore = reports.reduce((sum, r) => sum + r.score, 0);
+            const globalMaturity = reports.length > 0 ? Math.round(totalScore / reports.length) : report.score;
+
             generatePDF({
                 userName: report.userName,
                 sections: checklists?.value || [],
@@ -66,7 +68,8 @@ export default component$(() => {
                 totalProgress: { 
                     completed: report.completedCount, 
                     outOf: report.totalCount 
-                }
+                },
+                globalMaturity: globalMaturity
             });
         } catch (e) {
             console.error('Error downloading detailed report:', e);
@@ -101,12 +104,12 @@ export default component$(() => {
                 </div>
                 <div class="flex flex-wrap items-center gap-3">
                     <button 
-                      onClick$={() => handleExportPDF(client, reports)}
+                      onClick$={() => reports.length > 0 && handleDownloadDetail(reports[0])}
                       class="btn btn-outline btn-primary shadow-lg shadow-cyan-500/10 gap-2"
                       disabled={reports.length === 0}
                     >
                         <Icon icon="download" width={20} height={20} />
-                        Resumen PDF
+                        Descargar Reporte General
                     </button>
                     <button 
                       onClick$={handleResetHistory}

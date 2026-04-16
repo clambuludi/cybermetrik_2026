@@ -24,7 +24,8 @@ export default component$((props: { reports: Report[], sections: Sections }) => 
             month: 'short',
             day: 'numeric',
             hour: '2-digit',
-            minute: '2-digit'
+            minute: '2-digit',
+            timeZone: 'America/Guayaquil'
         });
     };
 

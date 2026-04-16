@@ -1,4 +1,4 @@
-import { $, component$, useOnWindow, useSignal } from "@builder.io/qwik";
+import { component$, useComputed$ } from "@builder.io/qwik";
 
 import { useLocalStorage } from "~/hooks/useLocalStorage";
 import type { Checklist, Section } from '~/types/PSC';
@@ -7,39 +7,29 @@ import styles from './psc.module.css';
 
 export default component$((props: { sections: Section[] }) => {
 
-  // Create signals to store the number of items done or ignored per section
-  const completions = useSignal<number[]>();
-  const done = useSignal<number[]>();
-
   // Get the IDs of completed and ignore items from local storage
-  const [checked] = useLocalStorage('PSC_PROGRESS', {});
-  const [ignored] = useLocalStorage('PSC_IGNORED', {});
+  const [checked] = useLocalStorage('PSC_PROGRESS', {} as Record<string, boolean>);
+  const [ignored] = useLocalStorage('PSC_IGNORED', {} as Record<string, boolean>);
 
-  /**
-   * Get the percentage of completion for a given section
-   * using completion data from local storage, and disregarding ignored items
-   */
-  const getPercentCompletion = $((section: Section): number => {
-    const id = (item: Checklist) => item.point.toLowerCase().replace(/ /g, '-')
-    const total = section.checklist.filter((item) => !ignored.value[id(item)]).length;
-    const done = section.checklist.filter((item) => checked.value[id(item)]).length;
-    return Math.round((done / total) * 100);
-  });
-
-  // On load (in browser only), calculate and set completion data for sections
-  useOnWindow('load', $(async () => {
+  // Compute stats for all sections reactively
+  const sectionStats = useComputed$(() => {
     const sections = Array.isArray(props.sections) ? props.sections : [];
-    // Percentage completion, per section
-    completions.value = await Promise.all(sections.map(section =>
-      getPercentCompletion(section),
-    ));
-    // Count of completed items, per section
-    done.value = await Promise.all(sections.map(section =>
-      section.checklist.filter(
-        (item) => checked.value[item.point.toLowerCase().replace(/ /g, '-')],
-      ).length
-    ));
-  }));
+    const id = (item: Checklist) => item.point.toLowerCase().replace(/ /g, '-').replace(/[^\w-]/g, '');
+    
+    return sections.map(section => {
+        const sectionItems = section.checklist || [];
+        const total = sectionItems.filter((item) => !ignored.value[id(item)]).length;
+        const countDone = sectionItems.filter((item) => checked.value[id(item)]).length;
+        const percentage = total === 0 ? 0 : Math.round((countDone / total) * 100);
+        
+        return {
+            done: countDone,
+            total,
+            itemsCount: sectionItems.length,
+            percentage
+        };
+    });
+  });
 
   return (
     <div class={[styles.container, 'grid',
@@ -57,13 +47,13 @@ export default component$((props: { sections: Section[] }) => {
         >
           <div class="flex-shrink-0 flex flex-col py-4 h-auto items-stretch justify-evenly">
             <Icon icon={section.icon || 'star'} color={section.color} />
-            {(done.value && done.value[index]) ? (
-              <p class={`text-${section.color}-400 pt-2 pb-0 px-0 mx-0 my-0`}>
-                {done.value[index]}/{section.checklist.length} Hecho
+            {(sectionStats.value[index]?.done > 0) ? (
+              <p class={`text-${section.color}-400 pt-2 pb-0 px-0 mx-0 my-0 text-center`}>
+                {sectionStats.value[index].done}/{sectionStats.value[index].itemsCount} Hecho
               </p>
             ) : (
-              <p class={`text-${section.color}-400 pt-2 pb-0 px-0 mx-0 my-0`}>
-                {section.checklist.length} Ítems
+              <p class={`text-${section.color}-400 pt-2 pb-0 px-0 mx-0 my-0 text-center`}>
+                {sectionStats.value[index].itemsCount} Ítems
               </p>
             )}
           </div>
@@ -71,17 +61,17 @@ export default component$((props: { sections: Section[] }) => {
             <h2 class={`card-title text-${section.color}-400 hover:text-${section.color}-500`}>
               {section.title}
             </h2>
-            <p class="p-0">{section.description}</p>
-            {(completions.value && completions.value[index]) ? (
+            <p class="p-0 text-sm line-clamp-2">{section.description}</p>
+            {(sectionStats.value[index]?.done > 0) ? (
               <div
                 class={['radial-progress absolute right-2 top-2 scale-75', `text-${section.color}-400`]}
-                style={`--value:${completions.value[index]}; --size: 2.5rem;`}
+                style={`--value:${sectionStats.value[index].percentage}; --size: 2.5rem; border: 2px solid rgba(255,255,255,0.05); shadow-lg`}
                 role="progressbar">
-                <span class="text-xs">{completions.value[index]}%</span>
+                <span class="text-[10px] font-bold">{sectionStats.value[index].percentage}%</span>
               </div>
             ) : (
-              <span class="absolute right-2 top-2 opacity-30 text-xs">
-                No iniciado aún
+              <span class="absolute right-2 top-2 opacity-30 text-[10px] italic">
+                Pendiente
               </span>
             )}
           </div>

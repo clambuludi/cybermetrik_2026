@@ -23,9 +23,13 @@ export const useSaveReport = globalAction$(
             .where(and(eq(reports.userId, userId), eq(reports.isFinalized, 0)))
             .limit(1);
         if (existingDrafts.length > 0) draft = existingDrafts[0];
-    } else {
-        // For guests, we could maybe track by name, but usually we just insert
-        // Given the requirement, let's assume authenticated users for tracking "conteo"
+    } else if (userName) {
+        // For guests, try to find a draft by name to avoid duplicates during the same session
+        const existingDrafts = await db.select()
+            .from(reports)
+            .where(and(eq(reports.userName, userName), eq(reports.isFinalized, 0)))
+            .limit(1);
+        if (existingDrafts.length > 0) draft = existingDrafts[0];
     }
 
     let result;
@@ -45,15 +49,13 @@ export const useSaveReport = globalAction$(
     } else {
         // Get next evaluation number
         let nextEvalNum = 1;
-        if (userId) {
-            const lastReports = await db.select({ num: reports.evaluationNumber })
-                .from(reports)
-                .where(eq(reports.userId, userId))
-                .orderBy(desc(reports.evaluationNumber))
-                .limit(1);
-            if (lastReports.length > 0) {
-                nextEvalNum = lastReports[0].num + 1;
-            }
+        const lastReports = await db.select({ num: reports.evaluationNumber })
+            .from(reports)
+            .where(userId ? eq(reports.userId, userId) : eq(reports.userName, userName))
+            .orderBy(desc(reports.evaluationNumber))
+            .limit(1);
+        if (lastReports.length > 0) {
+            nextEvalNum = (lastReports[0].num || 0) + 1;
         }
 
         // Insert new report

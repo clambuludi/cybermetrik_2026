@@ -1,4 +1,4 @@
-import { component$, useContextProvider, Slot } from "@builder.io/qwik";
+import { component$, useContextProvider, useStore, Slot } from "@builder.io/qwik";
 import { routeLoader$, type RequestHandler } from "@builder.io/qwik-city";
 import jsyaml from "js-yaml";
 
@@ -6,13 +6,16 @@ import Navbar from "~/components/furniture/nav";
 import Footer from "~/components/furniture/footer";
 import AuthModal from "~/components/auth/auth-modal";
 import { ChecklistContext } from "~/store/checklist-context";
+import { ProgressContext, type ProgressState } from "~/store/progress-context";
 import { UserContext, type UserContextType } from "~/store/user-context";
 import { verifyToken, COOKIE_NAME } from "~/utils/auth";
 import type { Sections } from "~/types/PSC";
+import { useChecklistSync } from "~/hooks/useChecklistSync";
+import { useSaveReport } from "~/routes/api/report";
 
 import { db } from "~/db";
-import { appConfig } from "~/db/schema";
-import { eq } from "drizzle-orm";
+import { appConfig, reports } from "~/db/schema";
+import { desc, eq } from "drizzle-orm";
 
 export const useChecklists = routeLoader$(async () => {
   let rawSections: Sections = [];
@@ -47,6 +50,24 @@ export const useCurrentUser = routeLoader$(async ({ cookie }) => {
   return verifyToken(token);
 });
 
+// Load the most recent saved report so useChecklistSync can hydrate from server on any route.
+export const useLayoutReportHistory = routeLoader$(async ({ cookie }) => {
+  const token = cookie.get(COOKIE_NAME)?.value;
+  const user = token ? verifyToken(token) : null;
+  if (!user) return null;
+  try {
+    const result = await db
+      .select()
+      .from(reports)
+      .where(eq(reports.userId, user.userId))
+      .orderBy(desc(reports.createdAt))
+      .limit(1);
+    return result[0] ?? null;
+  } catch {
+    return null;
+  }
+});
+
 export const onGet: RequestHandler = async ({ cacheControl }) => {
   cacheControl({
     staleWhileRevalidate: 60 * 60 * 24 * 7,
@@ -57,9 +78,26 @@ export const onGet: RequestHandler = async ({ cacheControl }) => {
 export default component$(() => {
   const checklists = useChecklists();
   const currentUser = useCurrentUser();
+  const latestReport = useLayoutReportHistory();
+
+  // Global progress state shared by ALL components (checklist-table, progress bar, etc.)
+  const progressState = useStore<ProgressState>({
+    completed: {},
+    ignored: {},
+    isReady: false,
+    isSyncing: false,
+  });
 
   useContextProvider(ChecklistContext, checklists);
   useContextProvider(UserContext, { user: currentUser.value } satisfies UserContextType);
+  useContextProvider(ProgressContext, progressState);
+
+  // Sync lives in the layout so it persists across ALL client-side route changes.
+  const hasHistory = !!latestReport.value;
+  const latestData = latestReport.value?.data;
+  useChecklistSync(hasHistory, latestData);
+  // useSaveReport must be called here (same component) so the action is in scope for the hook.
+  useSaveReport();
 
   const isLoggedIn = !!currentUser.value;
 

@@ -1,16 +1,16 @@
-import { $, component$, useStore, useSignal } from "@builder.io/qwik";
+import { $, component$, useStore, useSignal, useContext } from "@builder.io/qwik";
 import { useCSSTransition } from "qwik-transition";
 
 import Icon from "~/components/core/icon";
 import type { Priority, Section, Checklist } from '../../types/PSC';
 import { marked } from "marked";
-import { useChecklistSync } from "~/hooks/useChecklistSync";
+import { ProgressContext } from "~/store/progress-context";
 import styles from './psc.module.css';
 
 
 export default component$((props: { section: Section }) => {
 
-  const { completed, setCompleted$, ignored, setIgnored$, isSyncing } = useChecklistSync();
+  const progress = useContext(ProgressContext);
 
   const showFilters = useSignal(false);
   const { stage } = useCSSTransition(showFilters, { timeout: 300 });
@@ -51,14 +51,11 @@ export default component$((props: { section: Section }) => {
     return marked.parse(text || '', { async: false }) as string || '';
   };
 
-  const isIgnored = (pointId: string) => {
-    return ignored.value[pointId] || false;
-  };
-  
-
+  // Read directly from the shared reactive ProgressContext
+  const isIgnored = (pointId: string) => progress.ignored[pointId] || false;
   const isChecked = (pointId: string) => {
     if (isIgnored(pointId)) return false;
-    return completed.value[pointId] || false;
+    return progress.completed[pointId] || false;
   };
 
   const filteredChecklist = checklist.value.filter((item) => {
@@ -67,11 +64,9 @@ export default component$((props: { section: Section }) => {
     const itemIgnored = isIgnored(itemId);
     const itemLevel = item.priority;
 
-    // Filter by completion status
     if (filterState.show === 'remaining' && (itemCompleted || itemIgnored)) return false;
     if (filterState.show === 'completed' && !itemCompleted) return false;
 
-    // Filter by level
     return filterState.levels[itemLevel.toLocaleLowerCase() as Priority];
   });
 
@@ -79,9 +74,7 @@ export default component$((props: { section: Section }) => {
     const getValue = (item: Checklist) => {
       switch (sortState.column) {
         case 'done':
-          if (isIgnored(generateId(item.point))) {
-            return 2;
-          }
+          if (isIgnored(generateId(item.point))) return 2;
           return isChecked(generateId(item.point)) ? 0 : 1;
         case 'advice':
           return item.point;
@@ -93,22 +86,17 @@ export default component$((props: { section: Section }) => {
     };
     const valueA = getValue(a);
     const valueB = getValue(b);
-
-    if (valueA === valueB) {
-      return 0;
-    } else if (sortState.ascending) {
-      return valueA < valueB ? -1 : 1;
-    } else {
-      return valueA > valueB ? -1 : 1;
-    }
+    if (valueA === valueB) return 0;
+    else if (sortState.ascending) return valueA < valueB ? -1 : 1;
+    else return valueA > valueB ? -1 : 1;
   };
 
   const handleSort = $((column: string) => {
-    if (sortState.column === column) { // Reverse direction if same column
+    if (sortState.column === column) {
       sortState.ascending = !sortState.ascending;
-    } else { // Sort table by column
+    } else {
       sortState.column = column;
-      sortState.ascending = true; // Default to ascending
+      sortState.ascending = true;
     }
   });
 
@@ -150,7 +138,7 @@ export default component$((props: { section: Section }) => {
       <div>
         <progress class="progress w-64" value={percent} max="100"></progress>
         <p class="text-xs text-center flex items-center justify-center gap-1">
-          {isSyncing.value && <span class="loading loading-spinner loading-xs text-primary"></span>}
+          {progress.isSyncing && <span class="loading loading-spinner loading-xs text-primary"></span>}
           {done} out of {total} ({percent}%)
           complete, {disabled} ignored</p>
       </div>
@@ -269,9 +257,11 @@ export default component$((props: { section: Section }) => {
                   checked={isChecked(itemId)}
                   disabled={isIgnored(itemId)}
                   onClick$={() => {
-                    const data = completed.value;
-                    data[itemId] = !data[itemId];
-                    setCompleted$(data);
+                    // Replace with a new object so Qwik's proxy tracking fires correctly
+                    progress.completed = {
+                      ...progress.completed,
+                      [itemId]: !progress.completed[itemId]
+                    };
                   }}
                 />
                 <label for={`ignore-${itemId}`} class="text-small block opacity-50 mt-2">Ignore</label>
@@ -281,13 +271,12 @@ export default component$((props: { section: Section }) => {
                   class={`toggle toggle-xs toggle-${badgeColor}`}
                   checked={isIgnored(itemId)}
                   onClick$={() => {
-                    const ignoredData = ignored.value;
-                    ignoredData[itemId] = !ignoredData[itemId];
-                    setIgnored$(ignoredData);
-
-                    const completedData = completed.value;
-                    completedData[itemId] = false;
-                    setCompleted$(completedData);
+                    const newIgnored = !progress.ignored[itemId];
+                    progress.ignored = { ...progress.ignored, [itemId]: newIgnored };
+                    // If ignoring, uncheck the item
+                    if (newIgnored) {
+                      progress.completed = { ...progress.completed, [itemId]: false };
+                    }
                   }}
                 />
               </td>

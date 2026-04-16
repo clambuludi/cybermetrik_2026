@@ -45,19 +45,42 @@ export default component$((props: {
             let chartConfig: any = {};
 
             if (viewMode.value === 'temporal') {
-                // Sort by evaluation number ascending
-                const sortedReports = [...filteredReports].sort((a, b) => 
-                    (a.evaluationNumber || 0) - (b.evaluationNumber || 0)
-                );
+                // 1. Sort by date ascending to ensure chronological flow
+                const chronologicalReports = [...filteredReports].sort((a, b) => {
+                    const dateA = new Date((a.createdAt || '0').replace(' ', 'T')).getTime();
+                    const dateB = new Date((b.createdAt || '0').replace(' ', 'T')).getTime();
+                    return dateA - dateB;
+                });
 
-                const labels = sortedReports.map((r) => 
-                    r.isFinalized === 0 ? 'En progreso' : `Ev. ${r.evaluationNumber}`
-                );
-                
-                const fullDates = sortedReports.map(r => 
-                    r.createdAt ? new Date(r.createdAt.replace(' ', 'T')).toLocaleDateString('es-ES', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'N/A'
-                );
-                const scores = sortedReports.map(r => r.score);
+                // 2. Process labels: Finalized reports get Ev #, Drafts get "En progreso"
+                // We re-index them here to ensure it's always Ev. 1, 2, 3...
+                let finalizedCounter = 0;
+                const labels: string[] = [];
+                const scores: number[] = [];
+                const fullDates: string[] = [];
+                const pointColors: string[] = [];
+
+                chronologicalReports.forEach((r) => {
+                    const isDraft = r.isFinalized === 0;
+                    
+                    if (!isDraft) {
+                        finalizedCounter++;
+                        labels.push(`Ev. ${finalizedCounter}`);
+                        pointColors.push('#06b6d4'); // Cyan for finalized
+                    } else {
+                        labels.push('En progreso');
+                        pointColors.push('#f59e0b'); // Orange for draft
+                    }
+                    
+                    scores.push(r.score);
+                    fullDates.push(r.createdAt ? new Date(r.createdAt.replace(' ', 'T')).toLocaleDateString('es-ES', { 
+                        month: 'short', 
+                        day: 'numeric', 
+                        hour: '2-digit', 
+                        minute: '2-digit',
+                        timeZone: 'America/Guayaquil'
+                    }) : 'N/A');
+                });
 
                 const gradient = ctx.createLinearGradient(0, 0, 0, 400);
                 gradient.addColorStop(0, 'rgba(6, 182, 212, 0.4)');
@@ -75,10 +98,7 @@ export default component$((props: {
                             fill: true,
                             tension: 0.4,
                             borderWidth: 3,
-                            pointBackgroundColor: (context: any) => {
-                                const index = context.dataIndex;
-                                return sortedReports[index].isFinalized === 0 ? '#f59e0b' : '#06b6d4';
-                            },
+                            pointBackgroundColor: pointColors,
                             pointBorderColor: '#fff',
                             pointHoverRadius: 8,
                             pointRadius: 6,
@@ -138,11 +158,13 @@ export default component$((props: {
                     }
                 };
             } else {
-                // CATEGORIES VIEW (Radar Chart)
+                // CATEGORIES VIEW (Pro Bar Chart)
                 const labels: string[] = [];
                 const values: number[] = [];
                 
                 // If we have currentProgress, use it! Otherwise fallback to latest report
+                // IMPORTANT: Check if there's actual object keys to consider it "Data"
+                const hasLocalProgress = props.currentProgress && Object.keys(props.currentProgress).length > 0;
                 const useLocalData = !!props.currentProgress;
                 let dataToUse: Record<string, boolean> = {};
 
@@ -183,44 +205,59 @@ export default component$((props: {
                     values.push(Math.round((done / sectionItems.length) * 100));
                 });
 
+                const barGradient = ctx.createLinearGradient(0, 0, 400, 0);
+                barGradient.addColorStop(0, '#06b6d4'); // Cyan
+                barGradient.addColorStop(1, '#9333ea'); // Purple
+
                 chartConfig = {
-                    type: 'radar',
+                    type: 'bar',
                     data: {
                         labels,
                         datasets: [{
-                            label: useLocalData ? 'Situación Actual (%)' : 'Última Evaluación (%)',
+                            label: hasLocalProgress ? 'Progreso Actual (%)' : 'Nivel Alcanzado (%)',
                             data: values,
-                            backgroundColor: 'rgba(6, 182, 212, 0.2)',
-                            borderColor: '#06b6d4',
-                            pointBackgroundColor: '#06b6d4',
-                            pointBorderColor: '#fff',
-                            pointHoverBackgroundColor: '#fff',
-                            pointHoverBorderColor: '#06b6d4',
-                            borderWidth: 2
+                            backgroundColor: barGradient,
+                            borderRadius: 10,
+                            borderSkipped: false,
+                            barThickness: 24,
+                            hoverBackgroundColor: '#06b6d4',
                         }]
                     },
                     options: {
+                        indexAxis: 'y',
                         responsive: true,
                         maintainAspectRatio: false,
+                        layout: {
+                            padding: { left: 10, right: 30 }
+                        },
                         scales: {
-                            r: {
+                            x: {
                                 beginAtZero: true,
                                 max: 100,
-                                min: 0,
-                                ticks: { display: false, stepSize: 20 },
-                                grid: { color: 'rgba(255, 255, 255, 0.1)' },
-                                angleLines: { color: 'rgba(255, 255, 255, 0.1)' },
-                                pointLabels: { 
-                                    color: 'rgba(255, 255, 255, 0.7)',
-                                    font: { size: 10, weight: 'bold' } 
+                                grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                                ticks: { 
+                                    color: 'rgba(255, 255, 255, 0.5)',
+                                    callback: (v: any) => `${v}%` 
+                                }
+                            },
+                            y: {
+                                grid: { display: false },
+                                ticks: { 
+                                    color: '#fff',
+                                    font: { size: 12, weight: 'bold' }
                                 }
                             }
                         },
                         plugins: {
                             legend: { display: false },
                             tooltip: {
+                                backgroundColor: 'rgba(17, 24, 39, 0.95)',
+                                titleColor: '#06b6d4',
+                                bodyColor: '#fff',
+                                padding: 12,
+                                cornerRadius: 8,
                                 callbacks: {
-                                    label: (context: any) => `${context.label}: ${context.raw}%`
+                                    label: (context: any) => ` Nivel de Seguridad: ${context.raw}%`
                                 }
                             }
                         }
