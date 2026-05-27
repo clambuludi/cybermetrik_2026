@@ -20,6 +20,7 @@ export const reports = sqliteTable('reports', {
     data: text('data').notNull(), // JSON string with the checkedItems state
     isFinalized: integer('is_finalized').notNull().default(0), // 0: Draft, 1: Finalized
     evaluationNumber: integer('evaluation_number').notNull().default(1),
+    progresoParcialDecimal: text('progreso_parcial_decimal'), // JSON string of itemId -> decimal value
 });
 
 export const appConfig = sqliteTable('app_config', {

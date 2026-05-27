@@ -3,6 +3,7 @@ import { type DocumentHead, routeLoader$ } from "@builder.io/qwik-city";
 
 import Hero from "~/components/furniture/hero";
 import SectionLinkGrid from "~/components/psc/section-link-grid";
+import DashboardCompliance from "~/components/psc/dashboard-compliance";
 import Progress from "~/components/psc/progress";
 import MaturityTrend from '~/components/psc/maturity-trend';
 import ReportHistory from '~/components/psc/report-history';
@@ -61,9 +62,12 @@ export default component$(() => {
                 />
             )}
             {currentUser?.role !== 'admin' ? (
-                <SectionLinkGrid sections={
-                    (Array.isArray(checklists?.value) ? checklists.value : []) as any
-                } />
+                <div class="px-4 max-w-6xl mx-auto w-full">
+                    <DashboardCompliance />
+                    <SectionLinkGrid sections={
+                        (Array.isArray(checklists?.value) ? checklists.value : []) as any
+                    } />
+                </div>
             ) : (
                 <div class="mt-12 text-center">
                     <h2 class="text-2xl font-bold text-gray-300">Bienvenido al Panel Principal</h2>
@@ -78,6 +82,8 @@ export default component$(() => {
                         sections={checklists?.value || []}
                         showFilter={false}
                         currentProgress={progress.completed}
+                        ignoredItems={progress.ignored}
+                        evidenceLinks={progress.evidenceLinks}
                     />
                     <ReportHistory 
                         reports={reportsData.value || []} 

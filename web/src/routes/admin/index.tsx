@@ -6,6 +6,8 @@ import { desc, eq } from 'drizzle-orm';
 import { verifyToken, COOKIE_NAME } from '~/utils/auth';
 import type { DocumentHead } from '@builder.io/qwik-city';
 import { generateAdminSummaryPDF } from '~/utils/pdf-generator';
+import { calcularMadurezBloque, type ItemEvaluacion } from '~/utils/madurez';
+import { translateKeys } from '~/utils/key-translator';
 
 export const useAdminData = routeLoader$(async ({ cookie, redirect }) => {
   const token = cookie.get(COOKIE_NAME)?.value;
@@ -61,10 +63,18 @@ export default component$(() => {
     const r = rpts[0];
     if (r.score === 0 && r.data) {
       try {
-        const d = JSON.parse(r.data);
+        const d = translateKeys(JSON.parse(r.data));
         const items = d.checkedItems || d;
-        const done = Object.values(items).filter(Boolean).length;
-        return Math.round((done / (r.totalCount || 259)) * 100);
+        const ignoredItems = d.ignoredItems || {};
+        const evidenceLinks = d.evidenceLinks || {};
+        const itemsEvaluacion: ItemEvaluacion[] = Object.keys(items).map(key => ({
+            id: key,
+            opcion_seleccionada: ignoredItems[key] ? 'N/A' : (items[key] ?? 0.0),
+            progreso_parcial_decimal: d.progresoParcialDecimal?.[key] || null,
+            drive_link: evidenceLinks[key] || null
+        }));
+        const madurez = calcularMadurezBloque(itemsEvaluacion);
+        return madurez.porcentajeProgreso;
       } catch { return 0; }
     }
     return r.score ?? 0;

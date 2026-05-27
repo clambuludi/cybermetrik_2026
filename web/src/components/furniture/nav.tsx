@@ -8,6 +8,8 @@ import articles from '~/data/articles';
 import { ChecklistContext } from '~/store/checklist-context';
 import { UserContext } from '~/store/user-context';
 import { useLogout } from '~/routes/api/auth/logout';
+import { ProgressContext } from '~/store/progress-context';
+import { useNavigate, useLocation } from '@builder.io/qwik-city';
 
 
 export default component$(() => {
@@ -15,6 +17,23 @@ export default component$(() => {
   const { user: currentUser } = useContext(UserContext);
   const { theme, setTheme } = useTheme();
   const logoutAction = useLogout();
+  const progress = useContext(ProgressContext);
+  const nav = useNavigate();
+  const loc = useLocation();
+  const isHome = loc.url.pathname === '/';
+
+  const handleHomeNavigation = $((e: Event, path: string) => {
+    e.preventDefault();
+    if (progress?.ignored) {
+        const ignoredKeys = Object.keys(progress.ignored).filter(k => progress.ignored[k]);
+        const missingJustification = ignoredKeys.find(k => !progress.justifications || !progress.justifications[k] || progress.justifications[k].trim() === '');
+        if (missingJustification) {
+            alert('Debe llenar la justificación para todos los controles marcados como "NO APLICA" antes de regresar al inicio.');
+            return;
+        }
+    }
+    nav(path);
+  });
 
   const themes = [
     'dark', 'light', 'night', 'cupcake',
@@ -41,9 +60,27 @@ export default component$(() => {
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="inline-block w-6 h-6 stroke-current"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
             </label>
           </div>
-          <a href="/" class="btn btn-ghost text-xl flex capitalize">
-            <label for="my-drawer-3" aria-label="open sidebar" class="tooltip tooltip-bottom" data-tip="View all Pages"><Icon class="mr-2" icon="shield" width={28} height={28} /></label>
-            <h1>Digital Defense</h1>
+          <a href="/" preventdefault:click onClick$={(e) => handleHomeNavigation(e, '/')} class="btn btn-ghost h-auto py-3 px-4 flex items-center capitalize group hover:bg-base-200">
+            <div class="flex items-center gap-3">
+                <div class="relative flex items-center justify-center w-12 h-12">
+                    {!isHome && (
+                        <div class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 transform -translate-x-3 group-hover:translate-x-0">
+                            <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="text-primary"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+                        </div>
+                    )}
+                    <div class={`transition-all duration-300 ${!isHome ? 'group-hover:opacity-0 group-hover:scale-50' : ''}`}>
+                        <Icon class="text-primary" icon="shield" width={38} height={38} />
+                    </div>
+                </div>
+                <div class="flex flex-col items-start leading-none text-left">
+                    <h1 class="text-2xl font-black tracking-wide">Digital Defense</h1>
+                    {!isHome && (
+                        <span class="text-xs opacity-0 group-hover:opacity-100 transition-all duration-300 text-primary font-bold -translate-y-2 group-hover:translate-y-0 h-0 group-hover:h-[16px] overflow-hidden uppercase tracking-widest mt-1">
+                            Regresar al Inicio
+                        </span>
+                    )}
+                </div>
+            </div>
           </a>
         </div>
         <div class="flex-none hidden md:flex">
@@ -105,7 +142,17 @@ export default component$(() => {
                   <span class="text-sm font-medium hidden lg:block">{currentUser.name}</span>
                 </div>
                 <button
-                  onClick$={() => logoutAction.submit({})}
+                  onClick$={$(() => {
+                    localStorage.removeItem('PSC_PROGRESS');
+                    localStorage.removeItem('PSC_PARTIAL_DECIMAL');
+                    localStorage.removeItem('PSC_IGNORED');
+                    localStorage.removeItem('PSC_EVIDENCE');
+                    localStorage.removeItem('PSC_JUSTIFICATIONS');
+                    localStorage.removeItem('PSC_USER_NAME');
+                    localStorage.removeItem('PSC_WELCOME_DISMISSED');
+                    sessionStorage.removeItem('PSC_SYNCED_USER');
+                    logoutAction.submit({});
+                  })}
                   class="btn btn-ghost btn-sm btn-square tooltip tooltip-bottom"
                   data-tip="Cerrar sesión"
                 >
@@ -124,7 +171,7 @@ export default component$(() => {
             <Icon class="mr-2" icon="shield" width={16} height={16} />
             Digital Defense
           </h2>
-          <li><a href="/"><Icon class="mr-2" icon="homepage" width={16} height={16} />Home</a></li>
+          <li><a href="/" preventdefault:click onClick$={(e) => handleHomeNavigation(e, '/')}><Icon class="mr-2" icon="homepage" width={16} height={16} />Home</a></li>
           <li>
             <a href="/checklist"><Icon class="mr-2" icon="all" width={16} height={16} />Checklists</a>
             <ul>

@@ -16,20 +16,23 @@ export default component$(() => {
         console.log('[AUTH] Handling login for:', email.value);
         loading.value = true;
         
-        // Get local progress to migrate/merge
-        const localProgress = localStorage.getItem('PSC_PROGRESS');
-        const progress = localProgress ? JSON.parse(localProgress) : {};
-        
         const result = await loginAction.submit({ 
             email: email.value, 
             password: password.value,
-            progress 
         });
         
         console.log('[AUTH] Login result:', result);
         loading.value = false;
         if (result.value?.success) {
-            console.log('[AUTH] Login success, reloading...');
+            console.log('[AUTH] Login success, clearing local storage and reloading...');
+            localStorage.removeItem('PSC_PROGRESS');
+            localStorage.removeItem('PSC_PARTIAL_DECIMAL');
+            localStorage.removeItem('PSC_IGNORED');
+            localStorage.removeItem('PSC_EVIDENCE');
+            localStorage.removeItem('PSC_JUSTIFICATIONS');
+            localStorage.removeItem('PSC_USER_NAME');
+            localStorage.removeItem('PSC_WELCOME_DISMISSED');
+            sessionStorage.removeItem('PSC_SYNCED_USER');
             window.location.reload();
         }
     });
@@ -37,22 +40,23 @@ export default component$(() => {
     const handleRegister = $(async () => {
         loading.value = true;
         
-        // Get local progress to migrate
-        const localProgress = localStorage.getItem('PSC_PROGRESS');
-        const progress = localProgress ? JSON.parse(localProgress) : {};
-        
         const result = await registerAction.submit({ 
             name: name.value, 
             email: email.value, 
             password: password.value,
-            progress
         });
         
         loading.value = false;
         if (result.value?.success) {
+            console.log('[AUTH] Register success, clearing local storage and reloading...');
             localStorage.removeItem('PSC_PROGRESS');
+            localStorage.removeItem('PSC_PARTIAL_DECIMAL');
             localStorage.removeItem('PSC_IGNORED');
+            localStorage.removeItem('PSC_EVIDENCE');
+            localStorage.removeItem('PSC_JUSTIFICATIONS');
             localStorage.removeItem('PSC_USER_NAME');
+            localStorage.removeItem('PSC_WELCOME_DISMISSED');
+            sessionStorage.removeItem('PSC_SYNCED_USER');
             window.location.reload();
         }
     });

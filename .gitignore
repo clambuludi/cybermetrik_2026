@@ -1,0 +1,38 @@
+# Dependencias
+node_modules/
+web/node_modules/
+
+# Compilados y salidas de construcción
+dist/
+web/dist/
+web/lib/
+web/lib-types/
+web/server/
+web/tsconfig.tsbuildinfo
+
+# Archivos de base de datos local y temporales
+reports.db
+instance/
+web/tmp/
+
+# Entornos y variables
+.env
+.env.local
+*.local
+
+# Logs y cachés
+.cache/
+.mf/
+.rollup.cache/
+logs/
+*.log
+
+# Configuraciones de editores y SO
+.vscode/
+.idea/
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?

@@ -13,7 +13,7 @@ export const useSaveReport = globalAction$(
         if (session) userId = session.userId;
     }
 
-    const { userName, score, completedCount, totalCount, checkedItems, ignoredItems, finalize } = data;
+    const { userName, score, completedCount, totalCount, checkedItems, progresoParcialDecimal, ignoredItems, evidenceLinks, justifications, finalize, isoScore, egsiScore, clausesScore } = data;
 
     // 1. Look for existing draft
     let draft = null;
@@ -40,7 +40,8 @@ export const useSaveReport = globalAction$(
                 score,
                 completedCount,
                 totalCount,
-                data: JSON.stringify({ checkedItems, ignoredItems, ...checkedItems }),
+                data: JSON.stringify({ checkedItems, progresoParcialDecimal, ignoredItems, evidenceLinks, justifications, isoScore, egsiScore, clausesScore, ...checkedItems }),
+                progresoParcialDecimal: JSON.stringify(progresoParcialDecimal || {}),
                 isFinalized: finalize ? 1 : 0,
                 createdAt: new Date().toISOString().replace('T', ' ').substring(0, 19) // Update timestamp
             })
@@ -67,7 +68,8 @@ export const useSaveReport = globalAction$(
             totalCount,
             isFinalized: finalize ? 1 : 0,
             evaluationNumber: nextEvalNum,
-            data: JSON.stringify({ checkedItems, ignoredItems, ...checkedItems }),
+            data: JSON.stringify({ checkedItems, progresoParcialDecimal, ignoredItems, evidenceLinks, justifications, isoScore, egsiScore, clausesScore, ...checkedItems }),
+            progresoParcialDecimal: JSON.stringify(progresoParcialDecimal || {}),
         }).returning();
     }
     
@@ -78,9 +80,15 @@ export const useSaveReport = globalAction$(
     score: z.number(),
     completedCount: z.number(),
     totalCount: z.number(),
-    checkedItems: z.record(z.boolean()),
-    ignoredItems: z.record(z.boolean()).optional(),
+    checkedItems: z.record(z.union([z.boolean(), z.number()])),
+    progresoParcialDecimal: z.record(z.number()).optional(),
+    ignoredItems: z.record(z.union([z.boolean(), z.number()])).optional(),
+    evidenceLinks: z.record(z.string()).optional(),
+    justifications: z.record(z.string()).optional(),
     finalize: z.boolean().optional().default(false),
+    isoScore: z.number().optional(),
+    egsiScore: z.number().optional(),
+    clausesScore: z.number().optional(),
   })
 );
 

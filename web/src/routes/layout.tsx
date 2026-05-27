@@ -1,6 +1,8 @@
 import { component$, useContextProvider, useStore, Slot } from "@builder.io/qwik";
 import { routeLoader$, type RequestHandler } from "@builder.io/qwik-city";
 import jsyaml from "js-yaml";
+import Database from 'better-sqlite3';
+import path from 'path';
 
 import Navbar from "~/components/furniture/nav";
 import Footer from "~/components/furniture/footer";
@@ -18,30 +20,69 @@ import { appConfig, reports } from "~/db/schema";
 import { desc, eq } from "drizzle-orm";
 
 export const useChecklists = routeLoader$(async () => {
-  let rawSections: Sections = [];
+  const rawSections: Sections = [];
   try {
-    const config = await db.select().from(appConfig).where(eq(appConfig.key, 'global_checklist')).limit(1);
-    if (config.length > 0) {
-      rawSections = JSON.parse(config[0].value) as Sections;
-    } else {
-      const remoteUrl = 'https://raw.githubusercontent.com/Lissy93/personal-security-checklist/HEAD/personal-security-checklist.yml';
-      const res = await fetch(remoteUrl);
-      const text = await res.text();
-      rawSections = jsyaml.load(text) as Sections;
+    // Resolvemos la ruta a la base de datos de tus controles migrados
+    // process.cwd() suele apuntar por defecto a la carpeta web cuando corres el server de vite
+    const dbPath = path.resolve(process.cwd(), '../instance/cybermetrik.db');
+    const sqlite = new Database(dbPath, { readonly: true });
+    
+    // Obtenemos todos los controles que fijamos como activos
+    const rows = sqlite.prepare(`SELECT * FROM preguntas WHERE activo = 1`).all() as any[];
+    sqlite.close();
+
+    // Agrupamos las preguntas por dominio para formar las secciones
+    const grouped = rows.reduce((acc, row) => {
+      let dom = row.dominio;
+      
+      // Filtrado por ID: si el dominio está vacío o es un fallback genérico, usamos el prefijo del id_norma
+      if (!dom || dom === 'Dominio General' || dom.trim() === '') {
+        const id_norma = (row.id_norma || '').toString();
+        if (id_norma.startsWith('5.')) {
+          dom = 'Dominio 5: Organizacional';
+        } else if (id_norma.startsWith('6.')) {
+          dom = 'Dominio 6: Personas';
+        } else if (id_norma.startsWith('7.')) {
+          dom = 'Dominio 7: Físico';
+        } else if (id_norma.startsWith('8.')) {
+          dom = 'Dominio 8: Tecnológico';
+        } else {
+          dom = 'Cláusulas ISO 27001';
+        }
+      }
+
+      if (!acc[dom]) acc[dom] = [];
+      acc[dom].push({
+        point: row.pregunta,
+        priority: 'essential',
+        id_norma: row.id_norma,
+        id_dominio_egsi: row.id_dominio_egsi,
+        peso_gpr: row.peso_gpr,
+        details: `Norma ISO: ${row.id_norma || '-'} | Control: ${row.tipo_control || 'N/A'}`
+      });
+      return acc;
+    }, {} as Record<string, any[]>);
+
+    // Mapeamos los dominios al formato que el frontend espera (Section[])
+    for (const [dom, items] of Object.entries(grouped) as [string, any[]][]) {
+      rawSections.push({
+        title: dom,
+        slug: dom.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''),
+        description: `Controles de seguridad requeridos para: ${dom}`,
+        intro: 'Verifica y cumple con estos controles.',
+        icon: '🛡️',
+        color: 'blue',
+        checklist: items,
+        hidden: false
+      });
     }
+
   } catch (e) {
-    console.error("Error loading checklist config:", e);
+    console.error("Error cargando el checklist ISO desde sqlite:", e);
     return [];
   }
 
-  // Filter out hidden sections and questions
-  return rawSections
-    .filter(section => !section.hidden)
-    .map(section => ({
-      ...section,
-      checklist: (section.checklist || []).filter(item => !item.hidden)
-    }))
-    .filter(section => section.checklist.length > 0); // Only show sections that have visible items
+  return rawSections;
 });
 
 export const useCurrentUser = routeLoader$(async ({ cookie }) => {
@@ -83,7 +124,10 @@ export default component$(() => {
   // Global progress state shared by ALL components (checklist-table, progress bar, etc.)
   const progressState = useStore<ProgressState>({
     completed: {},
+    progresoParcialDecimal: {},
     ignored: {},
+    evidenceLinks: {},
+    justifications: {},
     isReady: false,
     isSyncing: false,
   });
@@ -95,7 +139,8 @@ export default component$(() => {
   // Sync lives in the layout so it persists across ALL client-side route changes.
   const hasHistory = !!latestReport.value;
   const latestData = latestReport.value?.data;
-  useChecklistSync(hasHistory, latestData);
+  const latestPartialDecimals = latestReport.value?.progresoParcialDecimal;
+  useChecklistSync(hasHistory, latestData, latestPartialDecimals);
   // useSaveReport must be called here (same component) so the action is in scope for the hook.
   useSaveReport();
 

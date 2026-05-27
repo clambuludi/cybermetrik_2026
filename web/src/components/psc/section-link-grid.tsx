@@ -1,31 +1,121 @@
-import { component$, useComputed$ } from "@builder.io/qwik";
+import { component$, useComputed$, useContext } from "@builder.io/qwik";
 
-import { useLocalStorage } from "~/hooks/useLocalStorage";
 import type { Checklist, Section } from '~/types/PSC';
 import Icon from '~/components/core/icon';
 import styles from './psc.module.css';
+import { ProgressContext } from '~/store/progress-context';
 
 export default component$((props: { sections: Section[] }) => {
 
-  // Get the IDs of completed and ignore items from local storage
-  const [checked] = useLocalStorage('PSC_PROGRESS', {} as Record<string, boolean>);
-  const [ignored] = useLocalStorage('PSC_IGNORED', {} as Record<string, boolean>);
+  const progress = useContext(ProgressContext);
 
   // Compute stats for all sections reactively
   const sectionStats = useComputed$(() => {
     const sections = Array.isArray(props.sections) ? props.sections : [];
     const id = (item: Checklist) => item.point.toLowerCase().replace(/ /g, '-').replace(/[^\w-]/g, '');
+    const SUB_ITEM_REGEX = /^(.+?\d+)\.?([a-z])$/;
     
     return sections.map(section => {
         const sectionItems = section.checklist || [];
-        const total = sectionItems.filter((item) => !ignored.value[id(item)]).length;
-        const countDone = sectionItems.filter((item) => checked.value[id(item)]).length;
+        const isClausesSection = section.title === 'Cláusulas ISO 27001';
+
+        const childrenMap = new Map<string, any[]>();
+        const parentItems: any[] = [];
+
+        sectionItems.forEach(item => {
+          const idNorma = (item as any).id_norma;
+          if (typeof idNorma === 'string' && idNorma.trim() !== '') {
+            const match = idNorma.trim().match(SUB_ITEM_REGEX);
+            if (match) {
+              const parentId = match[1];
+              if (!childrenMap.has(parentId)) {
+                childrenMap.set(parentId, []);
+              }
+              childrenMap.get(parentId)!.push(item);
+            } else {
+              parentItems.push(item);
+            }
+          } else {
+            parentItems.push(item);
+          }
+        });
+
+        const getSingleItemScore = (item: any) => {
+          const itemId = id(item);
+          if (progress.ignored[itemId]) return { score: 0, isIgnored: true };
+          const val = progress.completed[itemId];
+          const numericVal = typeof val === 'boolean' ? (val ? 1.0 : 0.0) : (val ?? 0.0);
+          const partialVal = progress.progresoParcialDecimal?.[itemId];
+          const pValue = partialVal !== undefined && partialVal !== null
+            ? Number(partialVal)
+            : (numericVal === 0.5 ? 0.50 : (numericVal === 1.0 ? 1.00 : 0.00));
+          return { score: pValue, isIgnored: false };
+        };
+
+        let total = 0;
+        let countDone = 0;
+
+        if (isClausesSection) {
+          total = 28;
+          sectionItems.forEach(item => {
+            const idNorma = (item as any).id_norma;
+            if (typeof idNorma === 'string' && idNorma.trim() !== '') {
+              const match = idNorma.trim().match(SUB_ITEM_REGEX);
+              if (match) {
+                const itemId = id(item);
+                if (!progress.ignored[itemId]) {
+                  const val = progress.completed[itemId];
+                  const numericVal = typeof val === 'boolean' ? (val ? 1.0 : 0.0) : (val ?? 0.0);
+                  const partialVal = progress.progresoParcialDecimal?.[itemId];
+                  const pValue = partialVal !== undefined && partialVal !== null
+                    ? Number(partialVal)
+                    : (numericVal === 0.5 ? 0.50 : (numericVal === 1.0 ? 1.00 : 0.00));
+                  const hasDriveLink = typeof progress.evidenceLinks?.[itemId] === 'string' && progress.evidenceLinks[itemId].trim() !== '';
+
+                  if (numericVal === 1.0 || numericVal === 0.5) {
+                    if (hasDriveLink) {
+                      countDone += pValue;
+                    } else {
+                      countDone += pValue * 0.4;
+                    }
+                  }
+                }
+              }
+            }
+          });
+        } else {
+          // Identify all parents in this section
+          const parentIdsWithChildren = new Set<string>();
+          sectionItems.forEach(item => {
+            const idNorma = (item as any).id_norma;
+            if (typeof idNorma === 'string' && idNorma.trim() !== '') {
+              const match = idNorma.trim().match(SUB_ITEM_REGEX);
+              if (match) {
+                parentIdsWithChildren.add(match[1]);
+              }
+            }
+          });
+
+          // Process only leaf items (those that are not parents)
+          sectionItems.forEach(item => {
+            const idNorma = (item as any).id_norma?.trim() || '';
+            const isParent = idNorma && parentIdsWithChildren.has(idNorma);
+            if (isParent) return; // Skip parent grouping headers
+
+            const { score, isIgnored } = getSingleItemScore(item);
+            if (!isIgnored) {
+              total++;
+              countDone += score;
+            }
+          });
+        }
+
         const percentage = total === 0 ? 0 : Math.round((countDone / total) * 100);
         
         return {
-            done: countDone,
+            done: Number(countDone.toFixed(2)),
             total,
-            itemsCount: sectionItems.length,
+            itemsCount: total,
             percentage
         };
     });
@@ -47,7 +137,11 @@ export default component$((props: { sections: Section[] }) => {
         >
           <div class="flex-shrink-0 flex flex-col py-4 h-auto items-stretch justify-evenly">
             <Icon icon={section.icon || 'star'} color={section.color} />
-            {(sectionStats.value[index]?.done > 0) ? (
+            {section.title === 'Cláusulas ISO 27001' ? (
+              <p class={`text-${section.color}-400 pt-2 pb-0 px-0 mx-0 my-0 text-center`}>
+                {sectionStats.value[index].done}/28 cláusulas
+              </p>
+            ) : (sectionStats.value[index]?.done > 0) ? (
               <p class={`text-${section.color}-400 pt-2 pb-0 px-0 mx-0 my-0 text-center`}>
                 {sectionStats.value[index].done}/{sectionStats.value[index].itemsCount} Hecho
               </p>
@@ -62,18 +156,12 @@ export default component$((props: { sections: Section[] }) => {
               {section.title}
             </h2>
             <p class="p-0 text-sm line-clamp-2">{section.description}</p>
-            {(sectionStats.value[index]?.done > 0) ? (
-              <div
-                class={['radial-progress absolute right-2 top-2 scale-75', `text-${section.color}-400`]}
-                style={`--value:${sectionStats.value[index].percentage}; --size: 2.5rem; border: 2px solid rgba(255,255,255,0.05); shadow-lg`}
-                role="progressbar">
-                <span class="text-[10px] font-bold">{sectionStats.value[index].percentage}%</span>
-              </div>
-            ) : (
-              <span class="absolute right-2 top-2 opacity-30 text-[10px] italic">
-                Pendiente
-              </span>
-            )}
+            <div
+              class={['radial-progress absolute right-2 top-2 scale-75', `text-${section.color}-400`]}
+              style={`--value:${sectionStats.value[index].percentage}; --size: 2.5rem; border: 2px solid rgba(255,255,255,0.05); shadow-lg`}
+              role="progressbar">
+              <span class="text-[10px] font-bold">{sectionStats.value[index].percentage}%</span>
+            </div>
           </div>
         </a>
       ))}

@@ -24,36 +24,7 @@ export const useLogin = globalAction$(
             return { success: false, error: 'Credenciales inválidas' };
         }
 
-        // Handle progress migration/merge if provided
-        if (data.progress && Object.keys(data.progress).length > 0) {
-            try {
-                // Get latest report to merge with
-                const [latestReport] = await db.select()
-                    .from(reports)
-                    .where(eq(reports.userId, user.id))
-                    .orderBy(desc(reports.createdAt))
-                    .limit(1);
 
-                let mergedData = data.progress;
-                if (latestReport) {
-                    const dbData = JSON.parse(latestReport.data);
-                    mergedData = { ...dbData, ...data.progress };
-                }
-
-                const completedCount = Object.values(mergedData).filter(Boolean).length;
-                await db.insert(reports).values({
-                    userId: user.id,
-                    userName: user.name,
-                    score: 0, 
-                    completedCount: completedCount,
-                    totalCount: latestReport?.totalCount || 259,
-                    data: JSON.stringify(mergedData),
-                });
-                console.log(`[LOGIN] Progress merged for: ${data.email}`);
-            } catch (e) {
-                console.error('[LOGIN] Failed to merge progress:', e);
-            }
-        }
 
         console.log(`[LOGIN] Success for: ${data.email} (${user.role})`);
         const payload: SessionPayload = {
@@ -76,6 +47,5 @@ export const useLogin = globalAction$(
     zod$({
         email: z.string().email('Email no válido'),
         password: z.string().min(1, 'Ingresa tu contraseña'),
-        progress: z.record(z.boolean()).optional(),
     })
 );
