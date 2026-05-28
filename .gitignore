@@ -10,9 +10,9 @@ web/lib-types/
 web/server/
 web/tsconfig.tsbuildinfo
 
-# Archivos de base de datos local y temporales
+# Archivos de base de datos local y temporales (ignoramos reports.db de producción/desarrollo)
 reports.db
-instance/
+web/reports.db
 web/tmp/
 
 # Entornos y variables

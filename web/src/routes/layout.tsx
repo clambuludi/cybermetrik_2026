@@ -24,7 +24,7 @@ export const useChecklists = routeLoader$(async () => {
   try {
     // Resolvemos la ruta a la base de datos de tus controles migrados
     // process.cwd() suele apuntar por defecto a la carpeta web cuando corres el server de vite
-    const dbPath = path.resolve(process.cwd(), '../instance/cybermetrik.db');
+    const dbPath = path.resolve(process.cwd(), 'instance/cybermetrik.db');
     const sqlite = new Database(dbPath, { readonly: true });
     
     // Obtenemos todos los controles que fijamos como activos
