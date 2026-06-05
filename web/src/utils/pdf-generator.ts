@@ -10,6 +10,7 @@ interface ReportData {
     globalMaturity?: number; // Cumulative maturity trend score
     ignoredItems?: Record<string, boolean>;
     evidenceLinks?: Record<string, string>;
+    justifications?: Record<string, string>;
 }
 
 export const generatePDF = async (data: ReportData) => {
@@ -248,6 +249,8 @@ export const generatePDF = async (data: ReportData) => {
 
     const childrenMap = new Map<string, any[]>();
     const parentItems: any[] = [];
+    const parentChildrenCounts = new Map<string, number>();
+    const parentNormalizedPointIds = new Map<string, string>();
     const SUB_ITEM_REGEX = /^(.+?\d+)\.?([a-z])$/;
     const generateId = (title: string) => title.toLowerCase().replace(/ /g, '-').replace(/[^\w-]/g, '');
 
@@ -259,20 +262,68 @@ export const generatePDF = async (data: ReportData) => {
                 const parentId = match[1];
                 if (!childrenMap.has(parentId)) childrenMap.set(parentId, []);
                 childrenMap.get(parentId)!.push(item);
+                parentChildrenCounts.set(parentId, (parentChildrenCounts.get(parentId) || 0) + 1);
             } else {
                 parentItems.push(item);
+                parentNormalizedPointIds.set(idNorma.trim(), generateId(item.point));
             }
         } else {
             parentItems.push(item);
         }
     });
 
+    const getItemHasLink = (item: any) => {
+        const itemId = generateId(item.point);
+        let hasLink = !!data.evidenceLinks?.[itemId];
+        
+        const idNorma = item.id_norma;
+        if (!hasLink && typeof idNorma === 'string' && idNorma.trim() !== '') {
+            const match = idNorma.trim().match(SUB_ITEM_REGEX);
+            if (match) {
+                const parentPrefix = match[1];
+                if (parentChildrenCounts.get(parentPrefix) === 1) {
+                    const parentItemId = parentNormalizedPointIds.get(parentPrefix);
+                    if (parentItemId) {
+                        const parentLink = data.evidenceLinks?.[parentItemId];
+                        if (typeof parentLink === 'string' && parentLink.trim() !== '') {
+                            hasLink = true;
+                        }
+                    }
+                }
+            }
+        }
+        return hasLink;
+    };
+
+    const getItemLink = (item: any) => {
+        const itemId = generateId(item.point);
+        let link = data.evidenceLinks?.[itemId] || '';
+        
+        const idNorma = item.id_norma;
+        if (!link && typeof idNorma === 'string' && idNorma.trim() !== '') {
+            const match = idNorma.trim().match(SUB_ITEM_REGEX);
+            if (match) {
+                const parentPrefix = match[1];
+                if (parentChildrenCounts.get(parentPrefix) === 1) {
+                    const parentItemId = parentNormalizedPointIds.get(parentPrefix);
+                    if (parentItemId) {
+                        const parentLink = data.evidenceLinks?.[parentItemId];
+                        if (typeof parentLink === 'string' && parentLink.trim() !== '') {
+                            link = parentLink;
+                        }
+                    }
+                }
+            }
+        }
+        return link;
+    };
+
     const getSingleItemScore = (item: any) => {
         const itemId = generateId(item.point);
         if (data.ignoredItems?.[itemId]) return { score: 0, isIgnored: true };
         const val = data.checkedItems[itemId];
         const numericVal = typeof val === 'boolean' ? (val ? 1.0 : 0.0) : (val ?? 0.0);
-        const hasLink = !!data.evidenceLinks?.[itemId];
+        const hasLink = getItemHasLink(item);
         const partialVal = data.progresoParcialDecimal?.[itemId];
         const pValue = partialVal !== undefined && partialVal !== null
           ? Number(partialVal)
@@ -384,7 +435,7 @@ export const generatePDF = async (data: ReportData) => {
                 totalItems++;
                 const val = data.checkedItems[itemId];
                 const numericVal = typeof val === 'boolean' ? (val ? 1.0 : 0.0) : (val ?? 0.0);
-                const hasLink = !!data.evidenceLinks?.[itemId];
+                const hasLink = getItemHasLink(item);
 
                 const partialVal = data.progresoParcialDecimal?.[itemId];
                 const pValue = partialVal !== undefined && partialVal !== null
@@ -538,7 +589,7 @@ export const generatePDF = async (data: ReportData) => {
 
         const val = data.checkedItems[itemId];
         const numericVal = typeof val === 'boolean' ? (val ? 1.0 : 0.0) : (val ?? 0.0);
-        const hasLink = !!data.evidenceLinks?.[itemId];
+        const hasLink = getItemHasLink(item);
 
         let finalScore = 0.0;
         if (numericVal === 1.0) {
@@ -715,7 +766,7 @@ export const generatePDF = async (data: ReportData) => {
 
         const val = data.checkedItems[itemId];
         const numericVal = typeof val === 'boolean' ? (val ? 1.0 : 0.0) : (val ?? 0.0);
-        const link = data.evidenceLinks?.[itemId];
+        const link = getItemLink(item);
 
         // NO CUMPLE (0 o undefined) pero tiene campo de evidencia lleno
         if (link && link.trim() !== '') {
@@ -783,6 +834,114 @@ export const generatePDF = async (data: ReportData) => {
             }
         });
     }
+
+    // --- 3. DETALLE COMPLETO DE RESPUESTAS (NUEVA SECCIÓN REQUERIDA) ---
+    doc.addPage();
+    drawHeader(doc);
+    
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(11);
+    doc.setTextColor(31, 41, 55); // Gris oscuro
+    doc.text("3. INFORME DETALLADO DE RESPUESTAS (COMPLETO)", 14, 44);
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(100);
+    doc.text("Listado de todos los requisitos y controles evaluados con sus respectivas respuestas y comentarios/justificaciones.", 14, 48.5);
+
+    // Build the detailed rows of answers, skipping parent items that have children
+    const leafItems = allItems.filter(item => {
+        const idNorma = (item.id_norma || '').trim();
+        return !childrenMap.has(idNorma);
+    });
+
+    const detailedRows = leafItems.map((item, idx) => {
+        const itemId = generateId(item.point);
+        const isIgnored = !!data.ignoredItems?.[itemId];
+        const val = data.checkedItems[itemId];
+        const numericVal = typeof val === 'boolean' ? (val ? 1.0 : 0.0) : (val ?? 0.0);
+        const hasLink = getItemHasLink(item);
+        const link = getItemLink(item);
+        
+        // Justification for N/A
+        const justification = data.justifications?.[itemId] || '';
+
+        // Status text
+        let statusText = 'No Cumple';
+        if (isIgnored) {
+            statusText = 'N/A - No Aplica';
+        } else if (numericVal === 1.0) {
+            statusText = 'Cumple';
+        } else if (numericVal === 0.5) {
+            statusText = 'Parcial';
+        }
+
+        // Calificación text
+        const partialVal = data.progresoParcialDecimal?.[itemId];
+        const pValue = partialVal !== undefined && partialVal !== null
+          ? Number(partialVal)
+          : (numericVal === 0.5 ? 0.50 : (numericVal === 1.0 ? 1.00 : 0.00));
+          
+        let scoreText = '0%';
+        if (isIgnored) {
+            scoreText = 'N/A';
+        } else if (numericVal === 1.0) {
+            scoreText = hasLink ? '100%' : '100% (Aporte: 40%)';
+        } else if (numericVal === 0.5) {
+            const pct = Math.round(pValue * 100);
+            scoreText = hasLink ? `${pct}%` : `${pct}% (Aporte: ${Math.round(pValue * 0.4 * 100)}%)`;
+        }
+
+        // Comentario / Evidencia
+        let commentOrEvidence = '';
+        if (isIgnored) {
+            commentOrEvidence = justification;
+        } else {
+            commentOrEvidence = link;
+        }
+
+        return [
+            item.id_norma || '-',
+            clean(item.point),
+            statusText,
+            scoreText,
+            clean(commentOrEvidence)
+        ];
+    });
+
+    const detailedHead = [['Codigo', 'Control / Requisito Evaluado', 'Estado', 'Calificacion', 'Evidencia / Comentario / Justificacion']];
+
+    autoTable(doc, {
+        startY: 52,
+        head: detailedHead,
+        body: detailedRows,
+        theme: 'grid',
+        headStyles: {
+            fillColor: [31, 41, 55],
+            textColor: 255,
+            halign: 'center',
+            fontStyle: 'bold',
+            fontSize: 8.5
+        },
+        styles: {
+            fontSize: 7.5,
+            valign: 'middle'
+        },
+        columnStyles: {
+            0: { halign: 'center', fontStyle: 'bold', width: 20 },
+            1: { width: 70 },
+            2: { halign: 'center', width: 25 },
+            3: { halign: 'center', fontStyle: 'bold', width: 25 },
+            4: { width: 40 }
+        },
+        margin: { top: 44, bottom: 20 },
+        didDrawPage: (pageData: any) => {
+            // Draw header on new pages created by autoTable (page Number relative to document starts at 3)
+            if (pageData.pageNumber > 3) {
+                drawHeader(doc);
+            }
+        }
+    });
 
     // Page numbering and footer
     const pageCount = (doc as any).internal.getNumberOfPages();

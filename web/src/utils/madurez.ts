@@ -263,6 +263,8 @@ export function calcularPuntajesConsistentes(
 
     const childrenMap = new Map<string, any[]>();
     const parentItems: any[] = [];
+    const parentChildrenCounts = new Map<string, number>();
+    const parentNormalizedPointIds = new Map<string, string>();
 
     section.checklist.forEach((item: any) => {
       const idNorma = (item as any).id_norma;
@@ -274,8 +276,10 @@ export function calcularPuntajesConsistentes(
             childrenMap.set(parentId, []);
           }
           childrenMap.get(parentId)!.push(item);
+          parentChildrenCounts.set(parentId, (parentChildrenCounts.get(parentId) || 0) + 1);
         } else {
           parentItems.push(item);
+          parentNormalizedPointIds.set(idNorma.trim(), generateId(item.point));
         }
       } else {
         parentItems.push(item);
@@ -294,7 +298,24 @@ export function calcularPuntajesConsistentes(
         ? Number(partialVal)
         : (numericVal === 0.5 ? 0.50 : (numericVal === 1.0 ? 1.00 : 0.00));
 
-      const hasDriveLink = typeof progress.evidenceLinks?.[itemId] === 'string' && progress.evidenceLinks[itemId].trim() !== '';
+      let hasDriveLink = typeof progress.evidenceLinks?.[itemId] === 'string' && progress.evidenceLinks[itemId].trim() !== '';
+
+      const idNorma = (item as any).id_norma;
+      if (!hasDriveLink && typeof idNorma === 'string' && idNorma.trim() !== '') {
+        const match = idNorma.trim().match(SUB_ITEM_REGEX);
+        if (match) {
+          const parentPrefix = match[1];
+          if (parentChildrenCounts.get(parentPrefix) === 1) {
+            const parentItemId = parentNormalizedPointIds.get(parentPrefix);
+            if (parentItemId) {
+              const parentLink = progress.evidenceLinks?.[parentItemId];
+              if (typeof parentLink === 'string' && parentLink.trim() !== '') {
+                hasDriveLink = true;
+              }
+            }
+          }
+        }
+      }
 
       let score = 0;
       if (numericVal === 1.0) {

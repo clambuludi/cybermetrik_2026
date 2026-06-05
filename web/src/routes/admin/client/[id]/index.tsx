@@ -102,8 +102,10 @@ export default component$(() => {
                 userName: report.userName,
                 sections: checklists?.value || [],
                 checkedItems: parsedData.checkedItems || parsedData,
+                progresoParcialDecimal: parsedData.progresoParcialDecimal || {},
                 ignoredItems: parsedData.ignoredItems || {},
                 evidenceLinks: parsedData.evidenceLinks || {},
+                justifications: parsedData.justifications || {},
                 totalProgress: { 
                     completed: report.completedCount, 
                     outOf: report.totalCount 
