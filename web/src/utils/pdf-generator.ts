@@ -10,6 +10,7 @@ interface ReportData {
     globalMaturity?: number; // Cumulative maturity trend score
     ignoredItems?: Record<string, boolean>;
     evidenceLinks?: Record<string, string>;
+    justifications?: Record<string, string>;
 }
 
 export const generatePDF = async (data: ReportData) => {
@@ -707,62 +708,74 @@ export const generatePDF = async (data: ReportData) => {
         }
     });
 
-    // --- 2. ALERTAS DE CONSISTENCIA DE EVIDENCIA (NUEVA SECCIÓN) ---
-    const consistencyAlerts: any[] = [];
+    // Build set of parent IDs that have children to identify grouping rows
+    const parentIdsWithChildren = new Set<string>();
     allItems.forEach(item => {
-        const itemId = item.point.toLowerCase().replace(/ /g, '-').replace(/[^\w-]/g, '');
-        if (data.ignoredItems?.[itemId]) return;
-
-        const val = data.checkedItems[itemId];
-        const numericVal = typeof val === 'boolean' ? (val ? 1.0 : 0.0) : (val ?? 0.0);
-        const link = data.evidenceLinks?.[itemId];
-
-        // NO CUMPLE (0 o undefined) pero tiene campo de evidencia lleno
-        if (link && link.trim() !== '') {
-            if (numericVal === 0 || numericVal === 0.0 || val === undefined || val === null) {
-                consistencyAlerts.push({
-                    code: item.id_norma || '-',
-                    name: clean(item.point),
-                    evidence: clean(link)
-                });
+        const idNorma = item.id_norma;
+        if (typeof idNorma === 'string' && idNorma.trim() !== '') {
+            const match = idNorma.trim().match(SUB_ITEM_REGEX);
+            if (match) {
+                parentIdsWithChildren.add(match[1]);
             }
         }
     });
 
-    if (consistencyAlerts.length > 0) {
-        let finalY = (doc as any).lastAutoTable.finalY || (strY + 9);
-        
-        // Si no hay suficiente espacio en la página actual, agregar nueva página
-        if (finalY + 45 > pageHeight - 20) {
-            doc.addPage();
-            drawHeader(doc);
-            finalY = 44;
-        } else {
-            finalY += 10;
+    // --- 2. DETALLE DE CONTROLES NO CUMPLIDOS ---
+    const noCumpleItems: any[] = [];
+    allItems.forEach(item => {
+        const itemId = generateId(item.point);
+        const isParent = typeof item.id_norma === 'string' && parentIdsWithChildren.has(item.id_norma.trim());
+        if (isParent) return; // Skip parent grouping headers
+        if (data.ignoredItems?.[itemId]) return;
+
+        const val = data.checkedItems[itemId];
+        const numericVal = typeof val === 'boolean' ? (val ? 1.0 : 0.0) : (val ?? 0.0);
+
+        // Add to list if compliance status is NO CUMPLE
+        if (numericVal !== 1.0 && numericVal !== 0.5) {
+            const comment = data.justifications?.[itemId] || "";
+            const evidence = data.evidenceLinks?.[itemId] || "";
+            
+            let commentAndEvidence = "";
+            if (comment) {
+                commentAndEvidence += `Comentario: ${comment}`;
+            }
+            if (evidence) {
+                if (commentAndEvidence) commentAndEvidence += "\n";
+                commentAndEvidence += `Evidencia: ${evidence}`;
+            }
+            if (!commentAndEvidence) {
+                commentAndEvidence = "-";
+            }
+
+            noCumpleItems.push([
+                item.id_norma || '-',
+                clean(item.point),
+                'NO CUMPLE',
+                clean(commentAndEvidence)
+            ]);
         }
+    });
+
+    if (noCumpleItems.length > 0) {
+        doc.addPage();
 
         doc.setFont("helvetica", "bold");
         doc.setFontSize(11);
-        doc.setTextColor(194, 65, 12); // Color naranja/óxido para alertas
-        doc.text("2. ALERTAS DE CONSISTENCIA: EVIDENCIA CARGADA SIN CUMPLIMIENTO", 14, finalY);
+        doc.setTextColor(194, 65, 12); // Naranja para advertencias de no cumplimiento
+        doc.text("2. DETALLE DE CONTROLES NO CUMPLIDOS", 14, 44);
 
         doc.setFont("helvetica", "normal");
         doc.setFontSize(8);
         doc.setTextColor(100);
-        doc.text("Los siguientes items estan marcados como NO CUMPLE o no estan seleccionados, pero contienen notas o enlaces de evidencia.", 14, finalY + 4.5);
+        doc.text("Los siguientes items estan marcados como NO CUMPLE o no estan seleccionados, mostrando su evidencia o anotacion si la tuvieran.", 14, 48.5);
 
-        const alertHead = [['Codigo', 'Item / Recomendacion', 'Estado', 'Evidencia / Anotacion']];
-        const alertBody = consistencyAlerts.map(alert => [
-            alert.code,
-            alert.name,
-            'No Cumple',
-            alert.evidence
-        ]);
+        const alertHead = [['Codigo', 'Control / Pregunta', 'Estado', 'Evidencia / Anotacion']];
 
         autoTable(doc, {
-            startY: finalY + 7,
+            startY: 52,
             head: alertHead,
-            body: alertBody,
+            body: noCumpleItems,
             theme: 'grid',
             headStyles: {
                 fillColor: [194, 65, 12],
@@ -772,17 +785,114 @@ export const generatePDF = async (data: ReportData) => {
                 fontSize: 8.5
             },
             styles: {
-                fontSize: 8,
+                fontSize: 7.5,
                 valign: 'middle'
             },
             columnStyles: {
                 0: { halign: 'center', fontStyle: 'bold', width: 22 },
-                1: { width: 88 },
-                2: { halign: 'center', fontStyle: 'bold', textColor: [194, 65, 12], width: 20 },
-                3: { width: 50 }
+                1: { width: 83 },
+                2: { halign: 'center', fontStyle: 'bold', textColor: [194, 65, 12], width: 32 },
+                3: { width: 45 }
+            },
+            margin: { top: 44, bottom: 20, left: 14, right: 14 },
+            didDrawPage: (dataDraw: any) => {
+                drawHeader(dataDraw.doc);
             }
         });
     }
+
+    // --- 3. DETALLE DE RESPUESTAS Y EVIDENCIAS DE CONTROL ---
+    doc.addPage();
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(11);
+    doc.setTextColor(31, 41, 55);
+    doc.text("3. DETALLE DE RESPUESTAS Y EVIDENCIAS DE CONTROL", 14, 44);
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(100);
+    doc.text("A continuacion se presenta el listado completo de los controles evaluados, su estado de cumplimiento y comentarios/evidencias.", 14, 48.5);
+
+    const detailedRows = allItems.map(item => {
+        const itemId = generateId(item.point);
+        const idNorma = item.id_norma || '-';
+        const isParent = typeof item.id_norma === 'string' && parentIdsWithChildren.has(item.id_norma.trim());
+        
+        let statusText = "-";
+        if (!isParent) {
+            const isIgnored = data.ignoredItems?.[itemId];
+            const val = data.checkedItems[itemId];
+            const numericVal = typeof val === 'boolean' ? (val ? 1.0 : 0.0) : (val ?? 0.0);
+            
+            if (isIgnored) {
+                statusText = "N/A - NO APLICA";
+            } else if (numericVal === 1.0) {
+                statusText = "CUMPLE";
+            } else if (numericVal === 0.5) {
+                const partialVal = data.progresoParcialDecimal?.[itemId];
+                if (partialVal !== undefined && partialVal !== null) {
+                    statusText = `PARCIAL (${Math.round(partialVal * 100)}%)`;
+                } else {
+                    statusText = "PARCIAL";
+                }
+            } else {
+                statusText = "NO CUMPLE";
+            }
+        }
+
+        const comment = data.justifications?.[itemId] || "";
+        const evidence = data.evidenceLinks?.[itemId] || "";
+        
+        let commentAndEvidence = "";
+        if (comment) {
+            commentAndEvidence += `Comentario: ${comment}`;
+        }
+        if (evidence) {
+            if (commentAndEvidence) commentAndEvidence += "\n";
+            commentAndEvidence += `Evidencia: ${evidence}`;
+        }
+        if (!commentAndEvidence) {
+            commentAndEvidence = "-";
+        }
+
+        return [
+            idNorma,
+            clean(item.point),
+            statusText,
+            clean(commentAndEvidence)
+        ];
+    });
+
+    const detailedHead = [['Codigo', 'Control / Pregunta', 'Estado', 'Evidencia / Comentario']];
+
+    autoTable(doc, {
+        startY: 52,
+        head: detailedHead,
+        body: detailedRows,
+        theme: 'grid',
+        headStyles: {
+            fillColor: [31, 41, 55],
+            textColor: 255,
+            halign: 'center',
+            fontStyle: 'bold',
+            fontSize: 8.5
+        },
+        styles: {
+            fontSize: 7.5,
+            valign: 'middle'
+        },
+        columnStyles: {
+            0: { halign: 'center', fontStyle: 'bold', width: 22 },
+            1: { width: 83 },
+            2: { halign: 'center', fontStyle: 'bold', width: 32 },
+            3: { width: 45 }
+        },
+        margin: { top: 44, bottom: 20, left: 14, right: 14 },
+        didDrawPage: (dataDraw: any) => {
+            drawHeader(dataDraw.doc);
+        }
+    });
 
     // Page numbering and footer
     const pageCount = (doc as any).internal.getNumberOfPages();

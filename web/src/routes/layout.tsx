@@ -2,8 +2,8 @@ import { component$, useContextProvider, useStore, Slot } from "@builder.io/qwik
 import { routeLoader$, type RequestHandler } from "@builder.io/qwik-city";
 import jsyaml from "js-yaml";
 import Database from 'better-sqlite3';
+import fs from 'fs';
 import path from 'path';
-
 import Navbar from "~/components/furniture/nav";
 import Footer from "~/components/furniture/footer";
 import AuthModal from "~/components/auth/auth-modal";
@@ -22,9 +22,16 @@ import { desc, eq } from "drizzle-orm";
 export const useChecklists = routeLoader$(async () => {
   const rawSections: Sections = [];
   try {
-    // Resolvemos la ruta a la base de datos de tus controles migrados
-    // process.cwd() suele apuntar por defecto a la carpeta web cuando corres el server de vite
-    const dbPath = path.resolve(process.cwd(), 'instance/cybermetrik.db');
+    // Resolve the path dynamically (handling both local Windows and production Linux)
+    let dbPath = path.resolve(process.cwd(), 'instance/cybermetrik.db');
+    if (!fs.existsSync(dbPath)) {
+      dbPath = path.resolve(process.cwd(), 'web/instance/cybermetrik.db');
+    }
+    // Fallback to absolute production path if neither exists
+    if (!fs.existsSync(dbPath)) {
+      dbPath = '/var/www/cybermetrik/web/instance/cybermetrik.db';
+    }
+
     const sqlite = new Database(dbPath, { readonly: true });
     
     // Obtenemos todos los controles que fijamos como activos

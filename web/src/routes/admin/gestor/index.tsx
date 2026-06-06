@@ -4,6 +4,7 @@ import { verifyToken, COOKIE_NAME } from '~/utils/auth';
 import type { DocumentHead } from '@builder.io/qwik-city';
 import Database from 'better-sqlite3';
 import path from 'path';
+import fs from 'fs';
 
 // Define expected db schema interface
 interface Pregunta {
@@ -25,7 +26,13 @@ export const useAdminPreguntas = routeLoader$(async ({ cookie, redirect }) => {
     if (!session || session.role !== 'admin') throw redirect(302, '/');
 
     try {
-        const dbPath = path.resolve(process.cwd(), 'instance/cybermetrik.db');
+        let dbPath = path.resolve(process.cwd(), 'instance/cybermetrik.db');
+        if (!fs.existsSync(dbPath)) {
+            dbPath = path.resolve(process.cwd(), 'web/instance/cybermetrik.db');
+        }
+        if (!fs.existsSync(dbPath)) {
+            dbPath = '/var/www/cybermetrik/web/instance/cybermetrik.db';
+        }
 
         const sqlite = new Database(dbPath, { readonly: true });
         // Retrieve all questions (active and inactive) so the admin can manage them
@@ -45,7 +52,13 @@ export const useSaveAdminPreguntas = routeAction$(async (data, { cookie }) => {
     if (!session || session.role !== 'admin') return { success: false, error: 'No autorizado' };
 
     try {
-        const dbPath = path.resolve(process.cwd(), 'instance/cybermetrik.db');
+        let dbPath = path.resolve(process.cwd(), 'instance/cybermetrik.db');
+        if (!fs.existsSync(dbPath)) {
+            dbPath = path.resolve(process.cwd(), 'web/instance/cybermetrik.db');
+        }
+        if (!fs.existsSync(dbPath)) {
+            dbPath = '/var/www/cybermetrik/web/instance/cybermetrik.db';
+        }
         const sqlite = new Database(dbPath);
         
         const payloadObj = JSON.parse(data.payload);
@@ -125,7 +138,13 @@ export const useDeletePreguntaAction = routeAction$(async (data, { cookie }) => 
         const idNum = typeof data.id === 'string' ? parseInt(data.id, 10) : data.id;
         if (isNaN(idNum) || idNum <= 0) return { success: false, error: 'ID inválido' };
         
-        const dbPath = path.resolve(process.cwd(), 'instance/cybermetrik.db');
+        let dbPath = path.resolve(process.cwd(), 'instance/cybermetrik.db');
+        if (!fs.existsSync(dbPath)) {
+            dbPath = path.resolve(process.cwd(), 'web/instance/cybermetrik.db');
+        }
+        if (!fs.existsSync(dbPath)) {
+            dbPath = '/var/www/cybermetrik/web/instance/cybermetrik.db';
+        }
         const sqlite = new Database(dbPath);
         const result = sqlite.prepare('DELETE FROM preguntas WHERE id = ?').run(idNum);
         sqlite.close();

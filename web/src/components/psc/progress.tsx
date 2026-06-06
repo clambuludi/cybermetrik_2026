@@ -277,6 +277,7 @@ export default component$((props: ProgressProps) => {
             progresoParcialDecimal: { ...progress.progresoParcialDecimal },
             ignoredItems: { ...progress.ignored },
             evidenceLinks: { ...(progress.evidenceLinks || {}) },
+            justifications: { ...(progress.justifications || {}) },
             totalProgress: { completed: done, outOf: total }
         });
     }

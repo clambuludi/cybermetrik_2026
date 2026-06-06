@@ -625,6 +625,14 @@ export default component$((props: { section: Section }) => {
                 return isChecked(itemId);
             }).length;
 
+            const parentItem = props.section.checklist.find(item => {
+                const norma = (item as any).id_norma;
+                return typeof norma === 'string' && norma.trim() === prefix;
+            });
+            const parentItemId = parentItem ? generateId(parentItem.point) : '';
+            const parentComment = parentItemId ? progress.justifications?.[parentItemId] : '';
+            const parentEvidence = parentItemId ? progress.evidenceLinks?.[parentItemId] : '';
+
             return (
               <>
                 {/* Group Header Row */}
@@ -651,14 +659,32 @@ export default component$((props: { section: Section }) => {
                         ]}>
                           {prefix}
                         </span>
-                        <span class={[
-                          "text-sm sm:text-base tracking-wide transition-all duration-300",
-                          isExpanded 
-                            ? "font-black text-white" 
-                            : "font-bold text-gray-400"
-                        ]}>
-                          {title}
-                        </span>
+                        <div class="flex flex-col">
+                          <span class={[
+                            "text-sm sm:text-base tracking-wide transition-all duration-300",
+                            isExpanded 
+                              ? "font-black text-white" 
+                              : "font-bold text-gray-400"
+                          ]}>
+                            {title}
+                          </span>
+                          {(parentComment || parentEvidence) && (
+                            <div class="mt-2 text-xs bg-slate-800/80 rounded-lg p-2.5 border border-slate-700/50 max-w-2xl font-normal leading-relaxed text-gray-300">
+                              {parentComment && (
+                                <p class="flex items-start gap-1">
+                                  <span class="font-bold text-cyan-400 shrink-0">Comentario:</span> 
+                                  <span>{parentComment}</span>
+                                </p>
+                              )}
+                              {parentEvidence && (
+                                <p class="flex items-start gap-1 mt-1">
+                                  <span class="font-bold text-emerald-400 shrink-0">Evidencia:</span> 
+                                  <a href={parentEvidence} target="_blank" class="text-cyan-400 hover:underline break-all">{parentEvidence}</a>
+                                </p>
+                              )}
+                            </div>
+                          )}
+                        </div>
                       </div>
                       <div class="flex items-center gap-3">
                         <span class={[

@@ -104,6 +104,7 @@ export default component$(() => {
                 checkedItems: parsedData.checkedItems || parsedData,
                 ignoredItems: parsedData.ignoredItems || {},
                 evidenceLinks: parsedData.evidenceLinks || {},
+                justifications: parsedData.justifications || {},
                 totalProgress: { 
                     completed: report.completedCount, 
                     outOf: report.totalCount 
