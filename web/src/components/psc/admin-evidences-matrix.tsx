@@ -10,7 +10,7 @@ interface AdminEvidencesMatrixProps {
 export default component$<AdminEvidencesMatrixProps>(({ latestReport, sections }) => {
     const searchQuery = useSignal('');
     const selectedPhase = useSignal<string>('all');
-    const selectedLink = useSignal<string | null>(null);
+    const selectedRow = useSignal<{ link: string; status: string } | null>(null);
     const showOnlyWithEvidence = useSignal<boolean>(true);
 
     const generateId = (title: string) => title.toLowerCase().replace(/ /g, '-').replace(/[^\w-]/g, '');
@@ -55,13 +55,47 @@ export default component$<AdminEvidencesMatrixProps>(({ latestReport, sections }
         }
     }
 
+    const SUB_ITEM_REGEX = /^(.+?\d+)\.?([a-z])$/;
+    
+    // Contar hijos por cada prefijo de padre
+    const parentChildrenCounts: Record<string, number> = {};
+    const parentNormalizedPointIds: Record<string, string> = {};
+    
+    allItems.forEach(item => {
+        const idNorma = item.id_norma;
+        if (typeof idNorma === 'string' && idNorma.trim() !== '') {
+            const match = idNorma.trim().match(SUB_ITEM_REGEX);
+            if (match) {
+                const parentPrefix = match[1];
+                parentChildrenCounts[parentPrefix] = (parentChildrenCounts[parentPrefix] || 0) + 1;
+            } else {
+                const parentId = generateId(item.point);
+                parentNormalizedPointIds[idNorma.trim()] = parentId;
+            }
+        }
+    });
+
     // Transformamos los controles de la norma y aplicamos la fórmula de pesos
     const rows = allItems.map(item => {
         const itemId = generateId(item.point);
         const ignored = !!ignoredItems[itemId];
         const val = checkedItems[itemId];
         const numericVal = typeof val === 'boolean' ? (val ? 1.0 : 0.0) : (val ?? 0.0);
-        const link = evidenceLinks[itemId] || '';
+        
+        let link = evidenceLinks[itemId] || '';
+        const idNorma = item.id_norma || '';
+        const match = idNorma.trim().match(SUB_ITEM_REGEX);
+        let isInherited = false;
+        if (!link && match) {
+            const parentPrefix = match[1];
+            if (parentChildrenCounts[parentPrefix] === 1) {
+                const parentItemId = parentNormalizedPointIds[parentPrefix];
+                if (parentItemId && evidenceLinks[parentItemId]) {
+                    link = evidenceLinks[parentItemId];
+                    isInherited = true;
+                }
+            }
+        }
         
         let status = 'No Cumple';
         let statusColor = 'badge-error';
@@ -101,6 +135,7 @@ export default component$<AdminEvidencesMatrixProps>(({ latestReport, sections }
             status,
             statusColor,
             link,
+            isInherited,
             aporteReal: ignored ? null : aporteReal,
             multiplier,
             ignored
@@ -209,13 +244,27 @@ export default component$<AdminEvidencesMatrixProps>(({ latestReport, sections }
                                     </td>
                                     <td class="text-center">
                                         {row.link ? (
-                                            <button 
-                                                onClick$={() => selectedLink.value = row.link}
-                                                class="btn btn-xs bg-purple-600 hover:bg-purple-700 text-white border-none gap-1 font-bold shadow-md shadow-purple-500/10"
-                                            >
-                                                <Icon icon="download" width={12} height={12} />
-                                                Ver Evidencia
-                                            </button>
+                                            <div class="flex flex-col items-center gap-0.5 justify-center">
+                                                <button 
+                                                    onClick$={() => selectedRow.value = { link: row.link, status: row.status }}
+                                                    class={[
+                                                        "btn btn-xs gap-1 font-bold shadow-md text-white border-none",
+                                                        row.status === 'No Cumple'
+                                                            ? "bg-orange-600 hover:bg-orange-700 shadow-orange-500/10"
+                                                            : (row.isInherited 
+                                                                ? "bg-blue-600 hover:bg-blue-700 shadow-blue-500/10" 
+                                                                : "bg-purple-600 hover:bg-purple-700 shadow-purple-500/10")
+                                                    ]}
+                                                >
+                                                    <Icon icon={row.status === 'No Cumple' ? "info" : "download"} width={12} height={12} />
+                                                    {row.status === 'No Cumple' ? 'Ver Comentario' : 'Ver Evidencia'}
+                                                </button>
+                                                {row.isInherited && (
+                                                    <span class="text-[9px] text-blue-400 font-bold uppercase tracking-wider">
+                                                        Heredado
+                                                    </span>
+                                                )}
+                                            </div>
                                         ) : (
                                             <span class="text-red-500 font-bold text-xs italic">
                                                 Pendiente
@@ -243,12 +292,12 @@ export default component$<AdminEvidencesMatrixProps>(({ latestReport, sections }
                 <p>Mostrando {filteredRows.length} controles.</p>
             </div>
 
-            {/* Modal para ver la dirección de la evidencia */}
-            {selectedLink.value && (
+            {/* Modal para ver la dirección de la evidencia / comentario */}
+            {selectedRow.value && (
                 <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
                     <div class="bg-gray-900 border border-gray-800 rounded-xl max-w-lg w-full p-6 shadow-2xl relative animate-in fade-in zoom-in duration-200">
                         <button 
-                            onClick$={() => selectedLink.value = null}
+                            onClick$={() => selectedRow.value = null}
                             class="absolute top-4 right-4 text-gray-400 hover:text-white transition-colors"
                         >
                             <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -257,35 +306,55 @@ export default component$<AdminEvidencesMatrixProps>(({ latestReport, sections }
                         </button>
                         
                         <h3 class="text-lg font-bold text-white mb-2 flex items-center gap-2">
-                            <Icon icon="info" class="text-purple-500" width={20} height={20} />
-                            Enlace de Evidencia Subida
+                            {selectedRow.value.status === 'No Cumple' ? (
+                                <>
+                                    <Icon icon="info" class="text-orange-500" width={20} height={20} />
+                                    Comentario de Incumplimiento
+                                </>
+                            ) : (
+                                <>
+                                    <Icon icon="info" class="text-purple-500" width={20} height={20} />
+                                    Enlace de Evidencia Subida
+                                </>
+                            )}
                         </h3>
                         
-                        <p class="text-xs opacity-60 mb-4">La dirección url registrada para este control es:</p>
+                        <p class="text-xs opacity-60 mb-4">
+                            {selectedRow.value.status === 'No Cumple' 
+                                ? 'El comentario o justificación registrado para este control es:' 
+                                : 'La dirección url registrada para este control es:'}
+                        </p>
                         
-                        <div class="bg-gray-950 border border-gray-800 p-3 rounded-lg font-mono text-xs break-all text-purple-400 select-all mb-4 select-text selection:bg-purple-600/30">
-                            {selectedLink.value}
+                        <div class={[
+                            "bg-gray-950 border border-gray-800 p-3 rounded-lg font-mono text-xs break-all select-all mb-4 select-text",
+                            selectedRow.value.status === 'No Cumple' 
+                                ? "text-orange-400 selection:bg-orange-600/30" 
+                                : "text-purple-400 selection:bg-purple-600/30"
+                        ]}>
+                            {selectedRow.value.link}
                         </div>
 
                         <div class="flex justify-end gap-2">
                             <button 
                                 onClick$={() => {
-                                    navigator.clipboard.writeText(selectedLink.value || '');
+                                    navigator.clipboard.writeText(selectedRow.value?.link || '');
                                 }}
                                 class="btn btn-sm btn-ghost gap-1 text-xs"
                             >
-                                Copiar Enlace
+                                Copiar {selectedRow.value.status === 'No Cumple' ? 'Texto' : 'Enlace'}
                             </button>
-                            <a 
-                                href={selectedLink.value}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                class="btn btn-sm btn-primary text-xs"
-                            >
-                                Abrir URL
-                            </a>
+                            {selectedRow.value.link.trim().startsWith('http') && (
+                                <a 
+                                    href={selectedRow.value.link}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    class="btn btn-sm btn-primary text-xs"
+                                >
+                                    Abrir URL
+                                </a>
+                            )}
                             <button 
-                                onClick$={() => selectedLink.value = null}
+                                onClick$={() => selectedRow.value = null}
                                 class="btn btn-sm btn-ghost text-xs"
                             >
                                 Cerrar

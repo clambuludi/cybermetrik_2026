@@ -46,7 +46,7 @@ export function useChecklistSync(hasHistory: boolean = false, latestData?: strin
                     progress.completed = restored;
                 }
                 if (storedPartial) {
-                    try { progress.progresoParcialDecimal = translateKeys(JSON.parse(storedPartial)); } catch (_) {}
+                    try { progress.progresoParcialDecimal = translateKeys(JSON.parse(storedPartial)); } catch (_) { /* ignore */ }
                 } else {
                     const newPartial: Record<string, number> = {};
                     for (const [k, v] of Object.entries(progress.completed)) {
@@ -61,12 +61,12 @@ export function useChecklistSync(hasHistory: boolean = false, latestData?: strin
                     progress.ignored = restoredIgnored;
                 }
                 if (storedEvidence) {
-                    try { progress.evidenceLinks = translateKeys(JSON.parse(storedEvidence)); } catch (_) {}
+                    try { progress.evidenceLinks = translateKeys(JSON.parse(storedEvidence)); } catch (_) { /* ignore */ }
                 }
                 if (storedJustifications) {
-                    try { progress.justifications = translateKeys(JSON.parse(storedJustifications)); } catch (_) {}
+                    try { progress.justifications = translateKeys(JSON.parse(storedJustifications)); } catch (_) { /* ignore */ }
                 }
-            } catch (_) {}
+            } catch (_) { /* ignore */ }
             progress.isReady = true;
             return;
         }
@@ -91,7 +91,7 @@ export function useChecklistSync(hasHistory: boolean = false, latestData?: strin
 
                     let serverPartial: Record<string, number> = {};
                     if (latestPartialDecimals) {
-                        try { serverPartial = translateKeys(JSON.parse(latestPartialDecimals)); } catch (_) {}
+                        try { serverPartial = translateKeys(JSON.parse(latestPartialDecimals)); } catch (_) { /* ignore */ }
                     } else if (parsed.progresoParcialDecimal) {
                         serverPartial = parsed.progresoParcialDecimal;
                     }
@@ -130,7 +130,7 @@ export function useChecklistSync(hasHistory: boolean = false, latestData?: strin
                         localStorage.setItem('PSC_EVIDENCE', JSON.stringify(newEvidence));
                         localStorage.setItem('PSC_JUSTIFICATIONS', JSON.stringify(newJustifications));
                         localStorage.setItem('PSC_SCHEMA_VERSION', schemaVersion);
-                    } catch (_) {}
+                    } catch (_) { /* ignore */ }
 
                     console.log(`[SYNC] Hydrated from server. Checked items: ${Object.keys(newCompleted).filter(k => newCompleted[k]).length}`);
                 } catch (e) {
@@ -150,7 +150,7 @@ export function useChecklistSync(hasHistory: boolean = false, latestData?: strin
                     localStorage.removeItem('PSC_IGNORED');
                     localStorage.removeItem('PSC_EVIDENCE');
                     localStorage.removeItem('PSC_JUSTIFICATIONS');
-                } catch (_) {}
+                } catch (_) { /* ignore */ }
             }
         } else {
             // Guest user
@@ -168,7 +168,7 @@ export function useChecklistSync(hasHistory: boolean = false, latestData?: strin
                     localStorage.removeItem('PSC_IGNORED');
                     localStorage.removeItem('PSC_EVIDENCE');
                     localStorage.removeItem('PSC_JUSTIFICATIONS');
-                } catch (_) {}
+                } catch (_) { /* ignore */ }
             } else {
                 // Returning guest — restore from localStorage
                 try {
@@ -188,7 +188,7 @@ export function useChecklistSync(hasHistory: boolean = false, latestData?: strin
                     }
 
                     if (storedPartial) {
-                        try { progress.progresoParcialDecimal = translateKeys(JSON.parse(storedPartial)); } catch (_) {}
+                        try { progress.progresoParcialDecimal = translateKeys(JSON.parse(storedPartial)); } catch (_) { /* ignore */ }
                     } else {
                         const newPartial: Record<string, number> = {};
                         for (const [k, v] of Object.entries(progress.completed)) {
@@ -207,21 +207,21 @@ export function useChecklistSync(hasHistory: boolean = false, latestData?: strin
                     }
 
                     if (storedEvidence) {
-                        try { progress.evidenceLinks = translateKeys(JSON.parse(storedEvidence)); } catch (_) {}
+                        try { progress.evidenceLinks = translateKeys(JSON.parse(storedEvidence)); } catch (_) { /* ignore */ }
                     }
                     if (storedJustifications) {
-                        try { progress.justifications = translateKeys(JSON.parse(storedJustifications)); } catch (_) {}
+                        try { progress.justifications = translateKeys(JSON.parse(storedJustifications)); } catch (_) { /* ignore */ }
                     }
 
                     console.log('[SYNC] Guest restored from local storage.');
-                } catch (_) {}
+                } catch (_) { /* ignore */ }
             }
         }
 
         sessionStorage.setItem('PSC_SYNCED_USER', currentUserId);
         try {
             localStorage.setItem('PSC_SCHEMA_VERSION', schemaVersion);
-        } catch (_) {}
+        } catch (_) { /* ignore */ }
         progress.isReady = true;
     });
 
@@ -254,7 +254,7 @@ export function useChecklistSync(hasHistory: boolean = false, latestData?: strin
             localStorage.setItem('PSC_EVIDENCE', JSON.stringify(progress.evidenceLinks || {}));
             localStorage.setItem('PSC_JUSTIFICATIONS', JSON.stringify(progress.justifications || {}));
             localStorage.setItem('PSC_SCHEMA_VERSION', 'v2');
-        } catch (_) {}
+        } catch (_) { /* ignore */ }
 
         // Only send to server if authenticated
         if (!currentUser) return;

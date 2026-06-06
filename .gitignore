@@ -13,6 +13,8 @@ web/tsconfig.tsbuildinfo
 # Archivos de base de datos local y temporales (ignoramos reports.db de producción/desarrollo)
 reports.db
 web/reports.db
+*.db
+**/*.db
 web/tmp/
 
 # Entornos y variables

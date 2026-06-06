@@ -249,6 +249,8 @@ export const generatePDF = async (data: ReportData) => {
 
     const childrenMap = new Map<string, any[]>();
     const parentItems: any[] = [];
+    const parentChildrenCounts = new Map<string, number>();
+    const parentNormalizedPointIds = new Map<string, string>();
     const SUB_ITEM_REGEX = /^(.+?\d+)\.?([a-z])$/;
     const generateId = (title: string) => title.toLowerCase().replace(/ /g, '-').replace(/[^\w-]/g, '');
 
@@ -260,20 +262,68 @@ export const generatePDF = async (data: ReportData) => {
                 const parentId = match[1];
                 if (!childrenMap.has(parentId)) childrenMap.set(parentId, []);
                 childrenMap.get(parentId)!.push(item);
+                parentChildrenCounts.set(parentId, (parentChildrenCounts.get(parentId) || 0) + 1);
             } else {
                 parentItems.push(item);
+                parentNormalizedPointIds.set(idNorma.trim(), generateId(item.point));
             }
         } else {
             parentItems.push(item);
         }
     });
 
+    const getItemHasLink = (item: any) => {
+        const itemId = generateId(item.point);
+        let hasLink = !!data.evidenceLinks?.[itemId];
+        
+        const idNorma = item.id_norma;
+        if (!hasLink && typeof idNorma === 'string' && idNorma.trim() !== '') {
+            const match = idNorma.trim().match(SUB_ITEM_REGEX);
+            if (match) {
+                const parentPrefix = match[1];
+                if (parentChildrenCounts.get(parentPrefix) === 1) {
+                    const parentItemId = parentNormalizedPointIds.get(parentPrefix);
+                    if (parentItemId) {
+                        const parentLink = data.evidenceLinks?.[parentItemId];
+                        if (typeof parentLink === 'string' && parentLink.trim() !== '') {
+                            hasLink = true;
+                        }
+                    }
+                }
+            }
+        }
+        return hasLink;
+    };
+
+    const getItemLink = (item: any) => {
+        const itemId = generateId(item.point);
+        let link = data.evidenceLinks?.[itemId] || '';
+        
+        const idNorma = item.id_norma;
+        if (!link && typeof idNorma === 'string' && idNorma.trim() !== '') {
+            const match = idNorma.trim().match(SUB_ITEM_REGEX);
+            if (match) {
+                const parentPrefix = match[1];
+                if (parentChildrenCounts.get(parentPrefix) === 1) {
+                    const parentItemId = parentNormalizedPointIds.get(parentPrefix);
+                    if (parentItemId) {
+                        const parentLink = data.evidenceLinks?.[parentItemId];
+                        if (typeof parentLink === 'string' && parentLink.trim() !== '') {
+                            link = parentLink;
+                        }
+                    }
+                }
+            }
+        }
+        return link;
+    };
+
     const getSingleItemScore = (item: any) => {
         const itemId = generateId(item.point);
         if (data.ignoredItems?.[itemId]) return { score: 0, isIgnored: true };
         const val = data.checkedItems[itemId];
         const numericVal = typeof val === 'boolean' ? (val ? 1.0 : 0.0) : (val ?? 0.0);
-        const hasLink = !!data.evidenceLinks?.[itemId];
+        const hasLink = getItemHasLink(item);
         const partialVal = data.progresoParcialDecimal?.[itemId];
         const pValue = partialVal !== undefined && partialVal !== null
           ? Number(partialVal)
@@ -385,7 +435,7 @@ export const generatePDF = async (data: ReportData) => {
                 totalItems++;
                 const val = data.checkedItems[itemId];
                 const numericVal = typeof val === 'boolean' ? (val ? 1.0 : 0.0) : (val ?? 0.0);
-                const hasLink = !!data.evidenceLinks?.[itemId];
+                const hasLink = getItemHasLink(item);
 
                 const partialVal = data.progresoParcialDecimal?.[itemId];
                 const pValue = partialVal !== undefined && partialVal !== null
@@ -539,7 +589,7 @@ export const generatePDF = async (data: ReportData) => {
 
         const val = data.checkedItems[itemId];
         const numericVal = typeof val === 'boolean' ? (val ? 1.0 : 0.0) : (val ?? 0.0);
-        const hasLink = !!data.evidenceLinks?.[itemId];
+        const hasLink = getItemHasLink(item);
 
         let finalScore = 0.0;
         if (numericVal === 1.0) {
@@ -842,7 +892,7 @@ export const generatePDF = async (data: ReportData) => {
         }
 
         const comment = data.justifications?.[itemId] || "";
-        const evidence = data.evidenceLinks?.[itemId] || "";
+        const evidence = getItemLink(item);
         
         let commentAndEvidence = "";
         if (comment) {

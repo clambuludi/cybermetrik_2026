@@ -440,7 +440,7 @@ export default component$((props: { section: Section }) => {
                 finalScore = hasDriveLink ? pValue : pValue * 0.4;
             }
 
-            let idNorma = getIdNorma(item);
+            const idNorma = getIdNorma(item);
             
             let recText = null;
             if (!isItemIgnored && finalScore < 1.0) {
@@ -525,46 +525,94 @@ export default component$((props: { section: Section }) => {
                     </div>
                     {!isItemIgnored && (
                         <div class="mt-2 dropdown">
-                            <div tabIndex={0} role="button" class={`btn btn-xs btn-outline ${progress.evidenceLinks?.[itemId] ? 'border-cyan-500 text-cyan-400 hover:bg-cyan-500/20' : 'border-gray-600 text-gray-400 hover:bg-gray-800'} gap-1 w-full flex items-center justify-between transition-all duration-300`}>
+                            <div tabIndex={0} role="button" class={[
+                                'btn btn-xs btn-outline gap-1 w-full flex items-center justify-between transition-all duration-300',
+                                progress.evidenceLinks?.[itemId] 
+                                    ? (getScore(itemId) === 0 ? 'border-red-500 text-red-400 hover:bg-red-500/20' : 'border-cyan-500 text-cyan-400 hover:bg-cyan-500/20')
+                                    : 'border-gray-600 text-gray-400 hover:bg-gray-800'
+                            ]}>
                                 <span class="truncate max-w-[80px] text-[9px] font-bold uppercase tracking-wider">
-                                    {progress.evidenceLinks?.[itemId] ? 'Vinculado' : 'Evidencia'}
+                                    {progress.evidenceLinks?.[itemId] ? 'Vinculado' : (getScore(itemId) === 0 ? 'Comentario' : 'Evidencia')}
                                 </span>
                                 {progress.evidenceLinks?.[itemId] ? (
-                                    <svg viewBox="0 0 20 20" fill="currentColor" class="w-3 h-3 text-cyan-400"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 1-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4-5.5z" clip-rule="evenodd" /></svg>
+                                    <svg viewBox="0 0 20 20" fill="currentColor" class={[
+                                        'w-3 h-3',
+                                        getScore(itemId) === 0 ? 'text-red-400' : 'text-cyan-400'
+                                    ]}><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 1-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4-5.5z" clip-rule="evenodd" /></svg>
                                 ) : (
                                     <svg viewBox="0 0 20 20" fill="currentColor" class="w-3 h-3"><path d="M12.232 4.232a2.5 2.5 0 013.536 3.536l-1.225 1.224a.75.75 0 001.061 1.06l1.224-1.224a4 4 0 00-5.656-5.656l-3 3a4 4 0 00.225 5.865.75.75 0 00.977-1.138 2.5 2.5 0 01-.142-3.667l3-3z" /><path d="M11.603 7.963a.75.75 0 00-.977 1.138 2.5 2.5 0 01.142 3.667l-3 3a2.5 2.5 0 01-3.536-3.536l1.225-1.224a.75.75 0 00-1.061-1.06l-1.224 1.224a4 4 0 105.656 5.656l3-3a4 4 0 00-.225-5.865z" /></svg>
                                 )}
                             </div>
                             <div tabIndex={0} class="dropdown-content z-[100] w-72 p-4 shadow-[0_10px_40px_rgba(0,0,0,0.5)] bg-[#1a1f2e]/95 backdrop-blur-xl rounded-2xl border border-gray-700/50 mt-1 left-0">
-                                <h3 class="font-black text-sm text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-400 mb-1 flex items-center gap-2">
-                                    Vincular Evidencia Drive
-                                </h3>
-                                <p class="text-[10px] text-gray-400 mb-3 leading-relaxed">
-                                    Pega aquí el enlace público o compartido de tu documento para evitar penalizaciones en el cálculo de madurez.
-                                </p>
-                                <div class="relative">
-                                    <input 
-                                        type="text" 
-                                        placeholder="https://drive.google.com/..." 
-                                        class="input input-bordered input-sm w-full bg-black/40 text-xs border-gray-700 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/50 transition-all pl-8"
-                                        value={progress.evidenceLinks?.[itemId] || ''}
-                                        onInput$={(e) => {
-                                            const val = (e.target as HTMLInputElement).value;
-                                            progress.evidenceLinks = { ...(progress.evidenceLinks || {}), [itemId]: val };
-                                        }}
-                                        onChange$={(e) => {
-                                            const val = (e.target as HTMLInputElement).value;
-                                            progress.evidenceLinks = { ...(progress.evidenceLinks || {}), [itemId]: val };
-                                        }}
-                                    />
-                                    <svg viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 text-gray-500 absolute left-2.5 top-2.5"><path d="M12.232 4.232a2.5 2.5 0 013.536 3.536l-1.225 1.224a.75.75 0 001.061 1.06l1.224-1.224a4 4 0 00-5.656-5.656l-3 3a4 4 0 00.225 5.865.75.75 0 00.977-1.138 2.5 2.5 0 01-.142-3.667l3-3z" /><path d="M11.603 7.963a.75.75 0 00-.977 1.138 2.5 2.5 0 01.142 3.667l-3 3a2.5 2.5 0 01-3.536-3.536l1.225-1.224a.75.75 0 00-1.061-1.06l-1.224 1.224a4 4 0 105.656 5.656l3-3a4 4 0 00-.225-5.865z" /></svg>
-                                </div>
+                                {getScore(itemId) === 0 ? (
+                                    <>
+                                        <h3 class="font-black text-sm text-transparent bg-clip-text bg-gradient-to-r from-red-400 to-orange-400 mb-1 flex items-center gap-2">
+                                            Comentario de Incumplimiento
+                                        </h3>
+                                        <p class="text-[10px] text-gray-400 mb-3 leading-relaxed">
+                                            Ingresa aquí la justificación, comentario o evidencia por la cual no se cumple con este control.
+                                        </p>
+                                        <textarea 
+                                            placeholder="Escribe un comentario o justificación aquí..." 
+                                            class="textarea textarea-bordered textarea-sm w-full bg-black/40 text-xs border-gray-700 focus:border-red-500 focus:ring-1 focus:ring-red-500/50 transition-all"
+                                            value={progress.evidenceLinks?.[itemId] || ''}
+                                            onInput$={(e) => {
+                                                const val = (e.target as HTMLTextAreaElement).value;
+                                                progress.evidenceLinks = { ...(progress.evidenceLinks || {}), [itemId]: val };
+                                            }}
+                                            onChange$={(e) => {
+                                                const val = (e.target as HTMLTextAreaElement).value;
+                                                progress.evidenceLinks = { ...(progress.evidenceLinks || {}), [itemId]: val };
+                                            }}
+                                            rows={3}
+                                        />
+                                    </>
+                                ) : (
+                                    <>
+                                        <h3 class="font-black text-sm text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-400 mb-1 flex items-center gap-2">
+                                            Vincular Evidencia Drive
+                                        </h3>
+                                        <p class="text-[10px] text-gray-400 mb-3 leading-relaxed">
+                                            Pega aquí el enlace público o compartido de tu documento para evitar penalizaciones en el cálculo de madurez.
+                                        </p>
+                                        <div class="relative">
+                                            <input 
+                                                type="text" 
+                                                placeholder="https://drive.google.com/..." 
+                                                class="input input-bordered input-sm w-full bg-black/40 text-xs border-gray-700 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/50 transition-all pl-8"
+                                                value={progress.evidenceLinks?.[itemId] || ''}
+                                                onInput$={(e) => {
+                                                    const val = (e.target as HTMLInputElement).value;
+                                                    progress.evidenceLinks = { ...(progress.evidenceLinks || {}), [itemId]: val };
+                                                }}
+                                                onChange$={(e) => {
+                                                    const val = (e.target as HTMLInputElement).value;
+                                                    progress.evidenceLinks = { ...(progress.evidenceLinks || {}), [itemId]: val };
+                                                }}
+                                            />
+                                            <svg viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 text-gray-500 absolute left-2.5 top-2.5"><path d="M12.232 4.232a2.5 2.5 0 013.536 3.536l-1.225 1.224a.75.75 0 001.061 1.06l1.224-1.224a4 4 0 00-5.656-5.656l-3 3a4 4 0 00.225 5.865.75.75 0 00.977-1.138 2.5 2.5 0 01-.142-3.667l3-3z" /><path d="M11.603 7.963a.75.75 0 00-.977 1.138 2.5 2.5 0 01.142 3.667l-3 3a2.5 2.5 0 01-3.536-3.536l1.225-1.224a.75.75 0 00-1.061-1.06l-1.224 1.224a4 4 0 105.656 5.656l3-3a4 4 0 00-.225-5.865z" /></svg>
+                                        </div>
+                                    </>
+                                )}
                                 {progress.evidenceLinks?.[itemId] && (
-                                    <div class="mt-3 flex items-center justify-between bg-cyan-500/10 rounded-lg p-2 border border-cyan-500/20">
-                                        <span class="text-[10px] text-cyan-200/70 font-medium">Enlace guardado en vivo.</span>
-                                        <a href={progress.evidenceLinks?.[itemId]} target="_blank" class="text-[10px] text-cyan-400 font-bold hover:underline flex items-center gap-1">
-                                            Probar <svg viewBox="0 0 20 20" fill="currentColor" class="w-3 h-3"><path fill-rule="evenodd" d="M4.25 5.5a.75.75 0 00-.75.75v8.5c0 .414.336.75.75.75h8.5a.75.75 0 00.75-.75v-4a.75.75 0 011.5 0v4A2.25 2.25 0 0112.75 17h-8.5A2.25 2.25 0 012 14.75v-8.5A2.25 2.25 0 014.25 4h5a.75.75 0 010 1.5h-5z" clip-rule="evenodd" /><path fill-rule="evenodd" d="M6.194 12.753a.75.75 0 001.06.053L16.5 4.44v2.81a.75.75 0 001.5 0v-4.5a.75.75 0 00-.75-.75h-4.5a.75.75 0 000 1.5h2.553l-9.056 8.194a.75.75 0 00-.053 1.06z" clip-rule="evenodd" /></svg>
-                                        </a>
+                                    <div class={[
+                                        'mt-3 flex items-center justify-between rounded-lg p-2 border',
+                                        getScore(itemId) === 0 ? 'bg-red-500/10 border-red-500/20' : 'bg-cyan-500/10 border-cyan-500/20'
+                                    ]}>
+                                        <span class={[
+                                            'text-[10px] font-medium',
+                                            getScore(itemId) === 0 ? 'text-red-200/70' : 'text-cyan-200/70'
+                                        ]}>
+                                            {getScore(itemId) === 0 ? 'Comentario guardado.' : 'Enlace guardado en vivo.'}
+                                        </span>
+                                        {progress.evidenceLinks?.[itemId].trim().startsWith('http') && (
+                                            <a href={progress.evidenceLinks?.[itemId]} target="_blank" class={[
+                                                'text-[10px] font-bold hover:underline flex items-center gap-1',
+                                                getScore(itemId) === 0 ? 'text-red-400' : 'text-cyan-400'
+                                            ]}>
+                                                Probar <svg viewBox="0 0 20 20" fill="currentColor" class="w-3 h-3"><path fill-rule="evenodd" d="M4.25 5.5a.75.75 0 00-.75.75v8.5c0 .414.336.75.75.75h8.5a.75.75 0 00.75-.75v-4a.75.75 0 011.5 0v4A2.25 2.25 0 0112.75 17h-8.5A2.25 2.25 0 012 14.75v-8.5A2.25 2.25 0 014.25 4h5a.75.75 0 010 1.5h-5z" clip-rule="evenodd" /><path fill-rule="evenodd" d="M6.194 12.753a.75.75 0 001.06.053L16.5 4.44v2.81a.75.75 0 001.5 0v-4.5a.75.75 0 00-.75-.75h-4.5a.75.75 0 000 1.5h2.553l-9.056 8.194a.75.75 0 00-.053 1.06z" clip-rule="evenodd" /></svg>
+                                            </a>
+                                        )}
                                     </div>
                                 )}
                             </div>
@@ -649,17 +697,17 @@ export default component$((props: { section: Section }) => {
                   }}
                 >
                   <td colSpan={4} class="p-4">
-                    <div class="flex items-center justify-between w-full">
-                      <div class="flex items-center gap-3">
-                        <span class={[
-                          "text-xs font-black px-2.5 py-1 rounded border font-mono tracking-wider transition-all duration-300",
-                          isExpanded 
-                            ? "text-cyan-400 bg-cyan-900/40 border-cyan-500/60 shadow-[0_0_8px_rgba(34,211,238,0.25)]"
-                            : "text-slate-400 bg-slate-800/40 border-slate-700/50"
-                        ]}>
-                          {prefix}
-                        </span>
-                        <div class="flex flex-col">
+                    <div class="flex flex-col gap-1 w-full">
+                      <div class="flex items-center justify-between w-full">
+                        <div class="flex items-center gap-3">
+                          <span class={[
+                            "text-xs font-black px-2.5 py-1 rounded border font-mono tracking-wider transition-all duration-300",
+                            isExpanded 
+                              ? "text-cyan-400 bg-cyan-900/40 border-cyan-500/60 shadow-[0_0_8px_rgba(34,211,238,0.25)]"
+                              : "text-slate-400 bg-slate-800/40 border-slate-700/50"
+                          ]}>
+                            {prefix}
+                          </span>
                           <span class={[
                             "text-sm sm:text-base tracking-wide transition-all duration-300",
                             isExpanded 
@@ -668,44 +716,99 @@ export default component$((props: { section: Section }) => {
                           ]}>
                             {title}
                           </span>
-                          {(parentComment || parentEvidence) && (
-                            <div class="mt-2 text-xs bg-slate-800/80 rounded-lg p-2.5 border border-slate-700/50 max-w-2xl font-normal leading-relaxed text-gray-300">
-                              {parentComment && (
-                                <p class="flex items-start gap-1">
-                                  <span class="font-bold text-cyan-400 shrink-0">Comentario:</span> 
-                                  <span>{parentComment}</span>
-                                </p>
-                              )}
-                              {parentEvidence && (
-                                <p class="flex items-start gap-1 mt-1">
-                                  <span class="font-bold text-emerald-400 shrink-0">Evidencia:</span> 
-                                  <a href={parentEvidence} target="_blank" class="text-cyan-400 hover:underline break-all">{parentEvidence}</a>
-                                </p>
-                              )}
-                            </div>
-                          )}
+                        </div>
+                        <div class="flex items-center gap-3">
+                          <span class={[
+                            "badge badge-sm font-bold px-2.5 py-1.5 transition-all duration-300 border",
+                            isExpanded
+                              ? "bg-cyan-900/60 border-cyan-500/50 text-cyan-300"
+                              : "bg-slate-800/40 border-slate-700/50 text-slate-400"
+                          ]}>
+                            {completedCount} / {items.length} completados
+                          </span>
+                          <svg 
+                            viewBox="0 0 20 20" 
+                            fill="currentColor" 
+                            class={[
+                              "w-5 h-5 transition-all duration-300",
+                              isExpanded ? "text-cyan-400 rotate-180 drop-shadow-[0_0_4px_rgba(34,211,238,0.5)]" : "text-slate-500 rotate-0"
+                            ]}
+                          >
+                            <path fill-rule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" />
+                          </svg>
                         </div>
                       </div>
-                      <div class="flex items-center gap-3">
-                        <span class={[
-                          "badge badge-sm font-bold px-2.5 py-1.5 transition-all duration-300 border",
-                          isExpanded
-                            ? "bg-cyan-900/60 border-cyan-500/50 text-cyan-300"
-                            : "bg-slate-800/40 border-slate-700/50 text-slate-400"
-                        ]}>
-                          {completedCount} / {items.length} completados
-                        </span>
-                        <svg 
-                          viewBox="0 0 20 20" 
-                          fill="currentColor" 
-                          class={[
-                            "w-5 h-5 transition-all duration-300",
-                            isExpanded ? "text-cyan-400 rotate-180 drop-shadow-[0_0_4px_rgba(34,211,238,0.5)]" : "text-slate-500 rotate-0"
-                          ]}
-                        >
-                          <path fill-rule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" />
-                        </svg>
-                      </div>
+
+                      {/* Parent comments display from HEAD */}
+                      {(parentComment || parentEvidence) && (
+                        <div class="mt-2 text-xs bg-slate-800/80 rounded-lg p-2.5 border border-slate-700/50 max-w-2xl font-normal leading-relaxed text-gray-300 ml-[3.25rem]">
+                          {parentComment && (
+                            <p class="flex items-start gap-1">
+                              <span class="font-bold text-cyan-400 shrink-0">Comentario:</span> 
+                              <span>{parentComment}</span>
+                            </p>
+                          )}
+                          {parentEvidence && (
+                            <p class="flex items-start gap-1 mt-1">
+                              <span class="font-bold text-emerald-400 shrink-0">Evidencia:</span> 
+                              <a href={parentEvidence} target="_blank" class="text-cyan-400 hover:underline break-all">{parentEvidence}</a>
+                            </p>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Single child literal preview from remote */}
+                      {(() => {
+                        if (items.length === 1) {
+                          const childItemId = generateId(items[0].point);
+                          // Resolve parent item ID to check both child and parent keys
+                          const parentItem = props.section.checklist.find(i => {
+                            const norma = (i as any).id_norma;
+                            return typeof norma === 'string' && norma.trim() === prefix;
+                          });
+                          const parentItemId = parentItem ? generateId(parentItem.point) : '';
+                          
+                          const childComment = progress.evidenceLinks?.[childItemId] || '';
+                          const parentComment = parentItemId ? (progress.evidenceLinks?.[parentItemId] || '') : '';
+                          
+                          const hasChild = childComment.trim() !== '';
+                          const hasParent = parentComment.trim() !== '';
+                          
+                          if (hasChild || hasParent) {
+                            const isNoCumple = getScore(childItemId) === 0;
+                            return (
+                              <div class="flex flex-col gap-1.5 mt-2 pl-[3.25rem] animate-fade-in">
+                                {hasParent && (
+                                  <div class="text-xs flex items-center gap-1.5 opacity-90">
+                                    <span class="font-black uppercase tracking-wider text-[9px] px-1.5 py-0.5 rounded border bg-slate-900 border-slate-700 text-slate-400">
+                                      Evidencia Literal:
+                                    </span>
+                                    <span class="text-gray-300 font-medium italic truncate max-w-[15rem] sm:max-w-[30rem]" title={parentComment}>
+                                      "{parentComment}"
+                                    </span>
+                                  </div>
+                                )}
+                                {hasChild && (!hasParent || childComment.trim() !== parentComment.trim()) && (
+                                  <div class="text-xs flex items-center gap-1.5 opacity-90">
+                                    <span class={[
+                                      'font-black uppercase tracking-wider text-[9px] px-1.5 py-0.5 rounded border',
+                                      isNoCumple 
+                                        ? 'bg-red-950/60 border-red-900 text-red-400 shadow-[0_0_4px_rgba(239,68,68,0.15)]' 
+                                        : 'bg-cyan-950/60 border-cyan-900 text-cyan-400 shadow-[0_0_4px_rgba(34,211,238,0.15)]'
+                                    ]}>
+                                      {isNoCumple ? 'Comentario:' : 'Evidencia:'}
+                                    </span>
+                                    <span class="text-gray-300 font-medium italic truncate max-w-[15rem] sm:max-w-[30rem]" title={childComment}>
+                                      "{childComment}"
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          }
+                        }
+                        return null;
+                      })()}
                     </div>
                   </td>
                 </tr>
@@ -717,7 +820,17 @@ export default component$((props: { section: Section }) => {
                     const isItemCompleted = isChecked(itemId);
                     const isItemIgnored = isIgnored(itemId);
                     const numericVal = getScore(itemId);
-                    const hasDriveLink = !!progress.evidenceLinks?.[itemId];
+
+                    const isSingleChild = items.length === 1;
+                    const parentItem = isSingleChild 
+                      ? props.section.checklist.find(i => {
+                          const norma = (i as any).id_norma;
+                          return typeof norma === 'string' && norma.trim() === prefix;
+                        })
+                      : null;
+                    const parentItemId = parentItem ? generateId(parentItem.point) : '';
+                    
+                    const hasDriveLink = !!(progress.evidenceLinks?.[itemId] || (isSingleChild && parentItemId && progress.evidenceLinks?.[parentItemId]));
                     
                     const partialVal = progress.progresoParcialDecimal?.[itemId];
                     const pValue = partialVal !== undefined && partialVal !== null
@@ -729,7 +842,7 @@ export default component$((props: { section: Section }) => {
                         finalScore = hasDriveLink ? pValue : pValue * 0.4;
                     }
 
-                    let idNorma = getIdNorma(item);
+                    const idNorma = getIdNorma(item);
                     
                     let recText = null;
                     if (!isItemIgnored && finalScore < 1.0) {
@@ -816,53 +929,145 @@ export default component$((props: { section: Section }) => {
                               )}
                           </div>
 
-                          {!isItemIgnored && (
+                           {!isItemIgnored && (
                               <div class="mt-2 dropdown">
-                                  <div tabIndex={0} role="button" class={`btn btn-xs btn-outline ${progress.evidenceLinks?.[itemId] ? 'border-cyan-500 text-cyan-400 hover:bg-cyan-500/20' : 'border-gray-600 text-gray-400 hover:bg-gray-800'} gap-1 w-full flex items-center justify-between transition-all duration-300`}>
+                                  <div tabIndex={0} role="button" class={[
+                                      'btn btn-xs btn-outline gap-1 w-full flex items-center justify-between transition-all duration-300',
+                                      hasDriveLink 
+                                          ? (getScore(itemId) === 0 ? 'border-red-500 text-red-400 hover:bg-red-500/20' : 'border-cyan-500 text-cyan-400 hover:bg-cyan-500/20')
+                                          : 'border-gray-600 text-gray-400 hover:bg-gray-800'
+                                  ]}>
                                       <span class="truncate max-w-[80px] text-[9px] font-bold uppercase tracking-wider">
-                                          {progress.evidenceLinks?.[itemId] ? 'Vinculado' : 'Evidencia'}
+                                          {hasDriveLink ? 'Vinculado' : (getScore(itemId) === 0 ? 'Comentario' : 'Evidencia')}
                                       </span>
-                                      {progress.evidenceLinks?.[itemId] ? (
-                                          <svg viewBox="0 0 20 20" fill="currentColor" class="w-3 h-3 text-cyan-400"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 1-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4-5.5z" clip-rule="evenodd" /></svg>
+                                      {hasDriveLink ? (
+                                          <svg viewBox="0 0 20 20" fill="currentColor" class={[
+                                              'w-3 h-3',
+                                              getScore(itemId) === 0 ? 'text-red-400' : 'text-cyan-400'
+                                          ]}><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 1-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4-5.5z" clip-rule="evenodd" /></svg>
                                       ) : (
                                           <svg viewBox="0 0 20 20" fill="currentColor" class="w-3 h-3"><path d="M12.232 4.232a2.5 2.5 0 013.536 3.536l-1.225 1.224a.75.75 0 001.061 1.06l1.224-1.224a4 4 0 00-5.656-5.656l-3 3a4 4 0 00.225 5.865.75.75 0 00.977-1.138 2.5 2.5 0 01-.142-3.667l3-3z" /><path d="M11.603 7.963a.75.75 0 00-.977 1.138 2.5 2.5 0 01.142 3.667l-3 3a2.5 2.5 0 01-3.536-3.536l1.225-1.224a.75.75 0 00-1.061-1.06l-1.224 1.224a4 4 0 105.656 5.656l3-3a4 4 0 00-.225-5.865z" /></svg>
                                       )}
                                   </div>
                                   <div tabIndex={0} class="dropdown-content z-[100] w-72 p-4 shadow-[0_10px_40px_rgba(0,0,0,0.5)] bg-[#1a1f2e]/95 backdrop-blur-xl rounded-2xl border border-gray-700/50 mt-1 left-0">
-                                      <h3 class="font-black text-sm text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-400 mb-1 flex items-center gap-2">
-                                          Vincular Evidencia Drive
-                                      </h3>
-                                      <p class="text-[10px] text-gray-400 mb-3 leading-relaxed">
-                                          Pega aquí el enlace público o compartido de tu documento para evitar penalizaciones en el cálculo de madurez.
-                                      </p>
-                                      <div class="relative">
-                                          <input 
-                                              type="text" 
-                                              placeholder="https://drive.google.com/..." 
-                                              class="input input-bordered input-sm w-full bg-black/40 text-xs border-gray-700 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/50 transition-all pl-8"
-                                              value={progress.evidenceLinks?.[itemId] || ''}
-                                              onInput$={(e) => {
-                                                  const val = (e.target as HTMLInputElement).value;
-                                                  progress.evidenceLinks = { ...(progress.evidenceLinks || {}), [itemId]: val };
-                                              }}
-                                              onChange$={(e) => {
-                                                  const val = (e.target as HTMLInputElement).value;
-                                                  progress.evidenceLinks = { ...(progress.evidenceLinks || {}), [itemId]: val };
-                                              }}
-                                          />
-                                          <svg viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 text-gray-500 absolute left-2.5 top-2.5"><path d="M12.232 4.232a2.5 2.5 0 013.536 3.536l-1.225 1.224a.75.75 0 001.061 1.06l1.224-1.224a4 4 0 00-5.656-5.656l-3 3a4 4 0 00.225 5.865.75.75 0 00.977-1.138 2.5 2.5 0 01-.142-3.667l3-3z" /><path d="M11.603 7.963a.75.75 0 00-.977 1.138 2.5 2.5 0 01.142 3.667l-3 3a2.5 2.5 0 01-3.536-3.536l1.225-1.224a.75.75 0 00-1.061-1.06l-1.224 1.224a4 4 0 105.656 5.656l3-3a4 4 0 00-.225-5.865z" /></svg>
-                                      </div>
-                                      {progress.evidenceLinks?.[itemId] && (
-                                          <div class="mt-3 flex items-center justify-between bg-cyan-500/10 rounded-lg p-2 border border-cyan-500/20">
-                                              <span class="text-[10px] text-cyan-200/70 font-medium">Enlace guardado en vivo.</span>
-                                              <a href={progress.evidenceLinks?.[itemId]} target="_blank" class="text-[10px] text-cyan-400 font-bold hover:underline flex items-center gap-1">
-                                                  Probar <svg viewBox="0 0 20 20" fill="currentColor" class="w-3 h-3"><path fill-rule="evenodd" d="M4.25 5.5a.75.75 0 00-.75.75v8.5c0 .414.336.75.75.75h8.5a.75.75 0 00.75-.75v-4a.75.75 0 011.5 0v4A2.25 2.25 0 0112.75 17h-8.5A2.25 2.25 0 012 14.75v-8.5A2.25 2.25 0 014.25 4h5a.75.75 0 010 1.5h-5z" clip-rule="evenodd" /><path fill-rule="evenodd" d="M6.194 12.753a.75.75 0 001.06.053L16.5 4.44v2.81a.75.75 0 001.5 0v-4.5a.75.75 0 00-.75-.75h-4.5a.75.75 0 000 1.5h2.553l-9.056 8.194a.75.75 0 00-.053 1.06z" clip-rule="evenodd" /></svg>
-                                              </a>
+                                      {getScore(itemId) === 0 ? (
+                                          <>
+                                              <h3 class="font-black text-sm text-transparent bg-clip-text bg-gradient-to-r from-red-400 to-orange-400 mb-1 flex items-center gap-2">
+                                                  Comentario de Incumplimiento
+                                              </h3>
+                                              <p class="text-[10px] text-gray-400 mb-3 leading-relaxed">
+                                                  Ingresa aquí la justificación, comentario o evidencia por la cual no se cumple con este control.
+                                              </p>
+                                              <textarea 
+                                                  placeholder="Escribe un comentario o justificación aquí..." 
+                                                  class="textarea textarea-bordered textarea-sm w-full bg-black/40 text-xs border-gray-700 focus:border-red-500 focus:ring-1 focus:ring-red-500/50 transition-all"
+                                                  value={progress.evidenceLinks?.[itemId] || (isSingleChild && parentItemId ? progress.evidenceLinks?.[parentItemId] : '') || ''}
+                                                  onInput$={(e) => {
+                                                      const val = (e.target as HTMLTextAreaElement).value;
+                                                      if (isSingleChild && parentItemId) {
+                                                          progress.evidenceLinks = { 
+                                                              ...(progress.evidenceLinks || {}), 
+                                                              [itemId]: val,
+                                                              [parentItemId]: val
+                                                          };
+                                                      } else {
+                                                          progress.evidenceLinks = { ...(progress.evidenceLinks || {}), [itemId]: val };
+                                                      }
+                                                  }}
+                                                  onChange$={(e) => {
+                                                      const val = (e.target as HTMLTextAreaElement).value;
+                                                      if (isSingleChild && parentItemId) {
+                                                          progress.evidenceLinks = { 
+                                                              ...(progress.evidenceLinks || {}), 
+                                                              [itemId]: val,
+                                                              [parentItemId]: val
+                                                          };
+                                                      } else {
+                                                          progress.evidenceLinks = { ...(progress.evidenceLinks || {}), [itemId]: val };
+                                                      }
+                                                  }}
+                                                  rows={3}
+                                              />
+                                          </>
+                                      ) : (
+                                          <>
+                                              <h3 class="font-black text-sm text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-400 mb-1 flex items-center gap-2">
+                                                  Vincular Evidencia Drive
+                                              </h3>
+                                              <p class="text-[10px] text-gray-400 mb-3 leading-relaxed">
+                                                  Pega aquí el enlace público o compartido de tu documento para evitar penalizaciones en el cálculo de madurez.
+                                              </p>
+                                              <div class="relative">
+                                                  <input 
+                                                      type="text" 
+                                                      placeholder="https://drive.google.com/..." 
+                                                      class="input input-bordered input-sm w-full bg-black/40 text-xs border-gray-700 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/50 transition-all pl-8"
+                                                      value={progress.evidenceLinks?.[itemId] || (isSingleChild && parentItemId ? progress.evidenceLinks?.[parentItemId] : '') || ''}
+                                                      onInput$={(e) => {
+                                                          const val = (e.target as HTMLInputElement).value;
+                                                          if (isSingleChild && parentItemId) {
+                                                              progress.evidenceLinks = { 
+                                                                  ...(progress.evidenceLinks || {}), 
+                                                                  [itemId]: val,
+                                                                  [parentItemId]: val
+                                                              };
+                                                          } else {
+                                                              progress.evidenceLinks = { ...(progress.evidenceLinks || {}), [itemId]: val };
+                                                          }
+                                                      }}
+                                                      onChange$={(e) => {
+                                                          const val = (e.target as HTMLInputElement).value;
+                                                          if (isSingleChild && parentItemId) {
+                                                              progress.evidenceLinks = { 
+                                                                  ...(progress.evidenceLinks || {}), 
+                                                                  [itemId]: val,
+                                                                  [parentItemId]: val
+                                                              };
+                                                          } else {
+                                                              progress.evidenceLinks = { ...(progress.evidenceLinks || {}), [itemId]: val };
+                                                          }
+                                                      }}
+                                                  />
+                                                  <svg viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 text-gray-500 absolute left-2.5 top-2.5"><path d="M12.232 4.232a2.5 2.5 0 013.536 3.536l-1.225 1.224a.75.75 0 001.061 1.06l1.224-1.224a4 4 0 00-5.656-5.656l-3 3a4 4 0 00.225 5.865.75.75 0 00.977-1.138 2.5 2.5 0 01-.142-3.667l3-3z" /><path d="M11.603 7.963a.75.75 0 00-.977 1.138 2.5 2.5 0 01.142 3.667l-3 3a2.5 2.5 0 01-3.536-3.536l1.225-1.224a.75.75 0 00-1.061-1.06l-1.224 1.224a4 4 0 105.656 5.656l3-3a4 4 0 00-.225-5.865z" /></svg>
+                                              </div>
+                                          </>
+                                      )}
+                                      {hasDriveLink && (
+                                          <div class={[
+                                              'mt-3 flex items-center justify-between rounded-lg p-2 border',
+                                              getScore(itemId) === 0 ? 'bg-red-500/10 border-red-500/20' : 'bg-cyan-500/10 border-cyan-500/20'
+                                          ]}>
+                                              <span class={[
+                                                  'text-[10px] font-medium',
+                                                  getScore(itemId) === 0 ? 'text-red-200/70' : 'text-cyan-200/70'
+                                              ]}>
+                                                  {getScore(itemId) === 0 ? 'Comentario guardado.' : 'Enlace guardado en vivo.'}
+                                              </span>
+                                              {(() => {
+                                                  const currentLink = progress.evidenceLinks?.[itemId] || (isSingleChild && parentItemId ? progress.evidenceLinks?.[parentItemId] : '') || '';
+                                                  if (currentLink.trim().startsWith('http')) {
+                                                      return (
+                                                          <a href={currentLink} target="_blank" class={[
+                                                              'text-[10px] font-bold hover:underline flex items-center gap-1',
+                                                              getScore(itemId) === 0 ? 'text-red-400' : 'text-cyan-400'
+                                                          ]}>
+                                                              Probar <svg viewBox="0 0 20 20" fill="currentColor" class="w-3 h-3"><path fill-rule="evenodd" d="M4.25 5.5a.75.75 0 00-.75.75v8.5c0 .414.336.75.75.75h8.5a.75.75 0 00.75-.75v-4a.75.75 0 011.5 0v4A2.25 2.25 0 0112.75 17h-8.5A2.25 2.25 0 012 14.75v-8.5A2.25 2.25 0 014.25 4h5a.75.75 0 010 1.5h-5z" clip-rule="evenodd" /><path fill-rule="evenodd" d="M6.194 12.753a.75.75 0 001.06.053L16.5 4.44v2.81a.75.75 0 001.5 0v-4.5a.75.75 0 00-.75-.75h-4.5a.75.75 0 000 1.5h2.553l-9.056 8.194a.75.75 0 00-.053 1.06z" clip-rule="evenodd" /></svg>
+                                                          </a>
+                                                      );
+                                                  }
+                                                  return null;
+                                              })()}
+                                          </div>
+                                      )}
+                                      {isSingleChild && parentItemId && progress.evidenceLinks?.[parentItemId] && progress.evidenceLinks?.[itemId] !== progress.evidenceLinks?.[parentItemId] && (
+                                          <div class="mt-3 p-2.5 bg-black/40 border border-gray-800 rounded-xl text-[10px] text-gray-300 leading-normal">
+                                              <strong class="text-cyan-400 block mb-1 font-bold uppercase tracking-wider text-[8px]">Evidencia en Literal ({prefix}):</strong>
+                                              <span class="italic font-medium">"{progress.evidenceLinks[parentItemId]}"</span>
                                           </div>
                                       )}
                                   </div>
                               </div>
-                          )}
+                           )}
 
                           {isItemIgnored && (
                               <div class="mt-1">
