@@ -440,7 +440,7 @@ export default component$((props: { section: Section }) => {
                 finalScore = hasDriveLink ? pValue : pValue * 0.4;
             }
 
-            let idNorma = getIdNorma(item);
+            const idNorma = getIdNorma(item);
             
             let recText = null;
             if (!isItemIgnored && finalScore < 1.0) {
@@ -814,7 +814,7 @@ export default component$((props: { section: Section }) => {
                         finalScore = hasDriveLink ? pValue : pValue * 0.4;
                     }
 
-                    let idNorma = getIdNorma(item);
+                    const idNorma = getIdNorma(item);
                     
                     let recText = null;
                     if (!isItemIgnored && finalScore < 1.0) {
