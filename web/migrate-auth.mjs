@@ -1,7 +1,20 @@
 import Database from 'better-sqlite3';
 import bcrypt from 'bcryptjs';
+import path from 'path';
+import fs from 'fs';
 
-const db = new Database('reports.db');
+// Resolve reports.db path dynamically
+let dbPath = path.resolve(process.cwd(), 'reports.db');
+if (!fs.existsSync(dbPath)) {
+    const webPath = path.resolve(process.cwd(), 'web/reports.db');
+    if (fs.existsSync(webPath)) {
+        dbPath = webPath;
+    } else if (process.platform !== 'win32') {
+        dbPath = '/var/www/cybermetrik/web/reports.db';
+    }
+}
+
+const db = new Database(dbPath);
 
 // Create users table
 db.exec(`

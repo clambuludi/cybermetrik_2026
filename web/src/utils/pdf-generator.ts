@@ -236,15 +236,15 @@ export const generatePDF = async (data: ReportData) => {
 
     // --- Unified Progress Table ---
     const categories = [
-        { name: 'Clausulas ISO 27001 (Req. de Evaluacion)', filter: (item: any) => !item.id_norma.startsWith('A.') && !item.id_norma.startsWith('EGSI.') },
-        { name: 'Controles Organizacionales (A5)', filter: (item: any) => item.id_norma.startsWith('A.5.') },
-        { name: 'Controles Personales (A6)', filter: (item: any) => item.id_norma.startsWith('A.6.') },
-        { name: 'Controles Fisicos (A7)', filter: (item: any) => item.id_norma.startsWith('A.7.') },
-        { name: 'Controles Tecnologicos (A8)', filter: (item: any) => item.id_norma.startsWith('A.8.') },
-        { name: 'EGSI Fase 1: Planificacion', filter: (item: any) => Number(item.id_dominio_egsi) === 6 },
-        { name: 'EGSI Fase 2: Ejecucion', filter: (item: any) => Number(item.id_dominio_egsi) === 7 },
-        { name: 'EGSI Fase 3: Control (Evaluacion)', filter: (item: any) => Number(item.id_dominio_egsi) === 8 },
-        { name: 'EGSI Fase 4: Cierre (Mejora)', filter: (item: any) => Number(item.id_dominio_egsi) === 9 },
+        { code: 'Cláusulas', name: 'Clausulas ISO 27001 (Req. de Evaluacion)', filter: (item: any) => !item.id_norma.startsWith('A.') && !item.id_norma.startsWith('EGSI.') },
+        { code: 'A.5', name: 'Controles Organizacionales (A5)', filter: (item: any) => item.id_norma.startsWith('A.5.') },
+        { code: 'A.6', name: 'Controles Personales (A6)', filter: (item: any) => item.id_norma.startsWith('A.6.') },
+        { code: 'A.7', name: 'Controles Fisicos (A7)', filter: (item: any) => item.id_norma.startsWith('A.7.') },
+        { code: 'A.8', name: 'Controles Tecnologicos (A8)', filter: (item: any) => item.id_norma.startsWith('A.8.') },
+        { code: 'EGSI F1', name: 'EGSI Fase 1: Planificacion', filter: (item: any) => Number(item.id_dominio_egsi) === 6 },
+        { code: 'EGSI F2', name: 'EGSI Fase 2: Ejecucion', filter: (item: any) => Number(item.id_dominio_egsi) === 7 },
+        { code: 'EGSI F3', name: 'EGSI Fase 3: Control (Evaluacion)', filter: (item: any) => Number(item.id_dominio_egsi) === 8 },
+        { code: 'EGSI F4', name: 'EGSI Fase 4: Cierre (Mejora)', filter: (item: any) => Number(item.id_dominio_egsi) === 9 },
     ];
 
     const childrenMap = new Map<string, any[]>();
@@ -337,98 +337,80 @@ export const generatePDF = async (data: ReportData) => {
         return { score, isIgnored: false };
     };
 
-    const getCategoryParentStats = (catName: string, filterFn: (item: any) => boolean) => {
-        let totalParents = 0;
-        let completedParents = 0;
-        let ignoredParents = 0;
-
-        parentItems.forEach(parent => {
-            if (!filterFn(parent)) return;
-            const parentIdNorma = parent.id_norma?.trim() || '';
-            const children = childrenMap.get(parentIdNorma) || [];
-
-            if (children.length > 0) {
-                let parentIgnored = true;
-                children.forEach(child => {
-                    const childId = generateId(child.point);
-                    if (!data.ignoredItems?.[childId]) {
-                        parentIgnored = false;
-                    }
-                });
-
-                if (parentIgnored) {
-                    ignoredParents++;
-                } else {
-                    totalParents++;
-                    let parentSum = 0;
-                    let activeChildren = 0;
-                    children.forEach(child => {
-                        const { score, isIgnored } = getSingleItemScore(child);
-                        if (!isIgnored) {
-                            parentSum += score;
-                            activeChildren++;
-                        }
-                    });
-                    const parentScore = activeChildren > 0 ? (parentSum / activeChildren) : 0;
-                    if (parentScore >= 100) {
-                        completedParents++;
-                    }
+    const getParentScore = (parent: any) => {
+        const parentIdNorma = parent.id_norma?.trim() || '';
+        const children = childrenMap.get(parentIdNorma) || [];
+        
+        if (children.length > 0) {
+            let parentSum = 0;
+            let activeChildrenCount = 0;
+            let parentIgnored = true;
+            
+            children.forEach(child => {
+                const childId = generateId(child.point);
+                if (!data.ignoredItems?.[childId]) {
+                    parentIgnored = false;
                 }
-            } else {
-                const itemId = generateId(parent.point);
-                if (data.ignoredItems?.[itemId]) {
-                    ignoredParents++;
-                } else {
-                    totalParents++;
-                    const { score } = getSingleItemScore(parent);
-                    if (score >= 100) {
-                        completedParents++;
-                    }
-                }
+            });
+            
+            if (parentIgnored) {
+                return { score: 0, isIgnored: true };
             }
-        });
-
-        return { totalParents, completedParents, ignoredParents };
+            
+            children.forEach(child => {
+                const { score, isIgnored } = getSingleItemScore(child);
+                if (!isIgnored) {
+                    parentSum += score;
+                    activeChildrenCount++;
+                }
+            });
+            
+            const parentScore = activeChildrenCount > 0 ? (parentSum / activeChildrenCount) : 0;
+            return { score: Math.round(parentScore), isIgnored: false };
+        } else {
+            const itemId = generateId(parent.point);
+            if (data.ignoredItems?.[itemId]) {
+                return { score: 0, isIgnored: true };
+            }
+            const { score } = getSingleItemScore(parent);
+            return { score, isIgnored: false };
+        }
     };
 
-    const categoryStats = categories.map(cat => {
-        let countStr = '';
+    const unifiedHead = [['Codigo', 'Control / Dimension', 'Cumplimiento']];
+    const unifiedBody: any[] = [];
+    const categoryHeaderRowIndices: number[] = [];
+    
+    let rowIndex = 0;
+    
+    categories.forEach(cat => {
         let progressPercent = 0;
-
         const isIsoCategory = cat.name.includes('A5') || cat.name.includes('A6') || cat.name.includes('A7') || cat.name.includes('A8') || cat.name.includes('Clausulas');
 
         if (isIsoCategory) {
-            const { totalParents, completedParents, ignoredParents } = getCategoryParentStats(cat.name, cat.filter);
-            
             if (cat.name.includes('A5')) progressPercent = Math.round((scores as any).a5Score);
             else if (cat.name.includes('A6')) progressPercent = Math.round((scores as any).a6Score);
             else if (cat.name.includes('A7')) progressPercent = Math.round((scores as any).a7Score);
             else if (cat.name.includes('A8')) progressPercent = Math.round((scores as any).a8Score);
             else if (cat.name.includes('Clausulas')) progressPercent = Math.round(scores.clausesScore);
 
-            countStr = `${completedParents}/${totalParents}${ignoredParents > 0 ? ` (${ignoredParents} N/A)` : ''}`;
             progressPercent = Math.min(100, Math.max(0, progressPercent));
         } else {
             let totalItems = 0;
-            let completedItems = 0;
             let scoreSum = 0;
-            let ignoredCount = 0;
             const isFase2 = cat.name.includes('Fase 2');
 
             allItems.forEach(item => {
                 if (!cat.filter(item)) return;
 
                 if (isFase2) {
-                    // Contabilizar solo controles del Anexo A (descartar cláusulas)
                     if (!item.id_norma || !item.id_norma.startsWith('A.')) return;
-                    // Descartar controles padres que contienen sub-ítems
                     const idNormaTrim = item.id_norma.trim();
                     if (childrenMap.has(idNormaTrim)) return;
                 }
 
                 const itemId = item.point.toLowerCase().replace(/ /g, '-').replace(/[^\w-]/g, '');
                 if (data.ignoredItems?.[itemId] && !isFase2) {
-                    ignoredCount++;
                     return;
                 }
 
@@ -448,36 +430,49 @@ export const generatePDF = async (data: ReportData) => {
                 }
 
                 scoreSum += finalScore;
-                if (numericVal === 1.0 || numericVal === 0.5) {
-                    completedItems++;
-                }
             });
 
             const activeTotal = isFase2 ? 133 : totalItems;
             progressPercent = activeTotal === 0 ? 0 : Math.round((scoreSum / activeTotal) * 100);
             progressPercent = Math.min(100, Math.max(0, progressPercent));
-            
-            countStr = isFase2 
-                ? `${completedItems}/133` 
-                : `${completedItems}/${activeTotal + ignoredCount}${ignoredCount > 0 ? ` (${ignoredCount} N/A)` : ''}`;
         }
-
-        return {
-            name: cat.name,
-            countStr,
-            progressStr: `${progressPercent}%`,
-            status: progressPercent === 100 ? 'Completado' : progressPercent > 0 ? 'En Progreso' : 'Sin Iniciar',
-            rawProgress: progressPercent
-        };
+        
+        // Add Category Header Row
+        categoryHeaderRowIndices.push(rowIndex);
+        unifiedBody.push([
+            cat.code,
+            clean(cat.name),
+            `${progressPercent}%`
+        ]);
+        rowIndex++;
+        
+        // Only breakdown parent controls if the category is A5, A6, A7, or A8
+        const shouldBreakdown = cat.code.startsWith('A.');
+        
+        if (shouldBreakdown) {
+            // Filter and sort parent items for this category
+            const catParents = parentItems.filter(p => cat.filter(p));
+            catParents.sort((a, b) => {
+                const codeA = a.id_norma || '';
+                const codeB = b.id_norma || '';
+                return codeA.localeCompare(codeB, undefined, { numeric: true, sensitivity: 'base' });
+            });
+            
+            // Add each Parent Control Row
+            catParents.forEach(parent => {
+                const { score, isIgnored } = getParentScore(parent);
+                const scoreText = isIgnored ? 'N/A' : `${score}%`;
+                const indentedName = `   ${clean(parent.point)}`;
+                
+                unifiedBody.push([
+                    parent.id_norma || '-',
+                    indentedName,
+                    scoreText
+                ]);
+                rowIndex++;
+            });
+        }
     });
-
-    const unifiedHead = [['Dimension / Fase Evaluada', 'Controles', 'Cumplimiento', 'Estado de Progreso']];
-    const unifiedBody = categoryStats.map(stat => [
-        stat.name,
-        stat.countStr,
-        stat.progressStr,
-        stat.status
-    ]);
 
     autoTable(doc, {
         startY: 82,
@@ -496,449 +491,18 @@ export const generatePDF = async (data: ReportData) => {
             valign: 'middle'
         },
         columnStyles: {
-            0: { fontStyle: 'bold', width: 75 },
-            1: { halign: 'center', width: 40 },
-            2: { halign: 'center', fontStyle: 'bold', textColor: [0, 120, 200] },
-            3: { halign: 'center' }
-        }
-    });
-
-    // --- Page 2: Gap Analysis & Dynamic Recommendations ---
-    const obtenerRecomendacion = (idNorma: string, isCritico: boolean) => {
-        const normaStr = (idNorma || '').trim().toUpperCase();
-        let dominio = 'gobernanza';
-        
-        if (normaStr.startsWith("EGSI-") || normaStr.startsWith("EGSI.")) {
-            dominio = 'egsi_exclusivo';
-        } else if (/^(4|9|10)\./.test(normaStr) || /^(9|4)\b/.test(normaStr)) {
-            dominio = 'gobernanza';
-        } else if (normaStr.startsWith('A.7.')) {
-            dominio = 'fisico';
-        } else if (normaStr.startsWith('A.8.')) {
-            dominio = 'tecnologico';
-        } else if (normaStr.startsWith('A.5.')) {
-            const parts = normaStr.split('.');
-            if (parts.length > 2) {
-                const sub = parseInt(parts[2], 10);
-                if (sub >= 1 && sub <= 4) dominio = 'gobernanza';
-                else dominio = 'organizacional';
-            } else {
-                dominio = 'organizacional';
-            }
-        } else if (normaStr.startsWith('A.6.')) {
-            const parts = normaStr.split('.');
-            if (parts.length > 2) {
-                const sub = parseInt(parts[2], 10);
-                if (sub >= 1 && sub <= 3) dominio = 'gobernanza';
-                else dominio = 'personas';
-            } else {
-                dominio = 'personas';
-            }
-        }
-
-        const plantillas = {
-            gobernanza: {
-                critico: "Establecer de manera formal el requisito base en el marco de gobierno de ciberseguridad.",
-                moderado: "Formalizar el documento y cargar el enlace de evidencia digital en Drive."
-            },
-            organizacional: {
-                critico: "Disenar desde cero las politicas internas y asignar responsables directos de control.",
-                moderado: "Revisar y cargar la politica formalizada en el repositorio de Drive."
-            },
-            personas: {
-                critico: "Estructurar controles de seguridad de personal, acuerdos y politicas de seleccion urgente.",
-                moderado: "Cargar las actas de compromiso o capacitacion firmadas en Drive."
-            },
-            fisico: {
-                critico: "Disenar plan de contingencia y control de accesos perimetrales de forma prioritaria.",
-                moderado: "Subir procedimientos estandarizados o registros de visitas y control fisico a Drive."
-            },
-            tecnologico: {
-                critico: "Implementacion tecnica inmediata: segmentacion, parches o endurecimiento logico.",
-                moderado: "Subir evidencia tecnica de configuracion formal o logs de respaldo en Drive."
-            },
-            egsi_exclusivo: {
-                critico: "Levantar el proceso ministerial obligatorio prioritario para evitar observaciones del ente estatal.",
-                moderado: "Cargar acta formalizada o informe de cumplimiento legal del EGSI v3.0 en Drive."
-            }
-        };
-
-        const p = (plantillas as any)[dominio] || plantillas.gobernanza;
-        return isCritico ? p.critico : p.moderado;
-    };
-
-    const getDomainDisplayName = (dom: string) => {
-        switch(dom) {
-            case 'gobernanza': return 'Gobernanza y Cumplimiento';
-            case 'organizacional': return 'Gobernanza y Politicas Organizacionales';
-            case 'personas': return 'Gestion y Seguridad de Personas';
-            case 'fisico': return 'Seguridad Fisica y Ambiental';
-            case 'tecnologico': return 'Seguridad Tecnologica y de Redes';
-            case 'egsi_exclusivo': return 'Hitos y Requisitos Gubernamentales EGSI';
-            default: return 'Gobernanza y Cumplimiento';
-        }
-    };
-
-    // Grouping Gaps logic
-    const groupedGaps: Record<string, { category: string, codes: string[], criticidad: string, recomendacion: string }> = {};
-    const detailedGapsForPlan: any[] = [];
-
-    allItems.forEach(item => {
-        const itemId = item.point.toLowerCase().replace(/ /g, '-').replace(/[^\w-]/g, '');
-        if (data.ignoredItems?.[itemId]) return;
-
-        const val = data.checkedItems[itemId];
-        const numericVal = typeof val === 'boolean' ? (val ? 1.0 : 0.0) : (val ?? 0.0);
-        const hasLink = getItemHasLink(item);
-
-        let finalScore = 0.0;
-        if (numericVal === 1.0) {
-            finalScore = hasLink ? 1.0 : 0.4;
-        } else if (numericVal === 0.5) {
-            finalScore = hasLink ? 0.5 : 0.2;
-        }
-
-        if (finalScore < 1.0) {
-            const isCritico = numericVal === 0.0;
-            const criticidadText = isCritico ? 'CRITICO' : 'MODERADO';
-            
-            const idNorma = item.id_norma || '-';
-            const normaStr = idNorma.trim().toUpperCase();
-            let dominio = 'gobernanza';
-            
-            if (normaStr.startsWith("EGSI-") || normaStr.startsWith("EGSI.")) {
-                dominio = 'egsi_exclusivo';
-            } else if (/^(4|9|10)\./.test(normaStr) || /^(9|4)\b/.test(normaStr)) {
-                dominio = 'gobernanza';
-            } else if (normaStr.startsWith('A.7.')) {
-                dominio = 'fisico';
-            } else if (normaStr.startsWith('A.8.')) {
-                dominio = 'tecnologico';
-            } else if (normaStr.startsWith('A.5.')) {
-                const parts = normaStr.split('.');
-                if (parts.length > 2) {
-                    const sub = parseInt(parts[2], 10);
-                    if (sub >= 1 && sub <= 4) dominio = 'gobernanza';
-                    else dominio = 'organizacional';
-                } else {
-                    dominio = 'organizacional';
-                }
-            } else if (normaStr.startsWith('A.6.')) {
-                const parts = normaStr.split('.');
-                if (parts.length > 2) {
-                    const sub = parseInt(parts[2], 10);
-                    if (sub >= 1 && sub <= 3) dominio = 'gobernanza';
-                    else dominio = 'personas';
-                } else {
-                    dominio = 'personas';
-                }
-            }
-
-            const key = `${dominio}_${criticidadText}`;
-            const rec = obtenerRecomendacion(idNorma, isCritico);
-            const categoryName = getDomainDisplayName(dominio);
-
-            if (!groupedGaps[key]) {
-                groupedGaps[key] = {
-                    category: categoryName,
-                    codes: [],
-                    criticidad: criticidadText,
-                    recomendacion: rec
-                };
-            }
-            groupedGaps[key].codes.push(idNorma);
-
-            detailedGapsForPlan.push({
-                code: idNorma,
-                name: clean(item.point),
-                peso_gpr: Number(item.peso_gpr) || 0.0,
-                isCritico
-            });
-        }
-    });
-
-    // --- Page 2: Fortalezas & Plan de Accion Priorizado ---
-    doc.addPage();
-    drawHeader(doc);
-
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(14);
-    doc.setTextColor(31, 41, 55);
-    doc.text("1. FORTALEZAS & PLAN DE ACCION PRIORIZADO", 14, 44);
-
-    // Fortalezas (100% completed categories)
-    doc.setFontSize(10.5);
-    doc.setTextColor(34, 197, 94); // Green
-    doc.text("FORTALEZAS DE LA INSTITUCION", 14, 52);
-
-    const strengthsList = categoryStats.filter(c => c.rawProgress === 100);
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(9);
-    doc.setTextColor(60);
-
-    let strY = 58;
-    if (strengthsList.length === 0) {
-        doc.text("- Ninguna fase o dimension evaluada ha alcanzado el 100% de cumplimiento todavia.", 14, strY);
-        strY += 6;
-    } else {
-        strengthsList.forEach(s => {
-            doc.text(`* Cumplimiento perfecto (100%) en: ${s.name}`, 14, strY);
-            strY += 6;
-        });
-    }
-
-    // Plan de Acción Priorizado
-    strY += 6;
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(10.5);
-    doc.setTextColor(31, 41, 55);
-    doc.text("PLAN DE ACCION PRIORIZADO", 14, strY);
-    
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(8.5);
-    doc.setTextColor(100);
-    doc.text("Lista priorizada por nivel de criticidad y peso GPR. Descripciones condensadas a una sola linea.", 14, strY + 5);
-
-    // Sort detailed gaps for the plan: Critical first, then by GPR weight descending
-    const sortedGaps = [...detailedGapsForPlan].sort((a, b) => {
-        if (a.isCritico && !b.isCritico) return -1;
-        if (!a.isCritico && b.isCritico) return 1;
-        return b.peso_gpr - a.peso_gpr;
-    });
-
-    const getActionPrefix = (code: string) => {
-        const c = (code || '').toUpperCase();
-        if (c.startsWith('A.5') || c.startsWith('A.6')) return 'Implementar';
-        if (c.startsWith('A.7') || c.startsWith('A.8')) return 'Configurar';
-        return 'Establecer';
-    };
-
-    const planHead = [['Prioridad', 'Codigo', 'Accion Recomendada', 'Impacto GPR (Peso)']];
-    const planBody = sortedGaps.slice(0, 10).map((gap, idx) => {
-        const prefix = getActionPrefix(gap.code);
-        const shortName = gap.name
-            .replace(/^Definir y /i, '')
-            .replace(/^Implementar /i, '')
-            .replace(/^Establecer /i, '')
-            .replace(/^Asegurar /i, '')
-            .replace(/^Garantizar /i, '');
-            
-        const actionDescription = `${prefix} ${shortName}`;
-        const truncatedAction = actionDescription.length > 70 ? actionDescription.substring(0, 67) + '...' : actionDescription;
-
-        return [
-            `${idx + 1}`,
-            gap.code,
-            truncatedAction,
-            `${gap.peso_gpr.toFixed(2)}`
-        ];
-    });
-
-    autoTable(doc, {
-        startY: strY + 9,
-        head: planHead,
-        body: planBody,
-        theme: 'grid',
-        headStyles: {
-            fillColor: [79, 70, 229], // Indigo
-            textColor: 255,
-            halign: 'center',
-            fontStyle: 'bold',
-            fontSize: 9
-        },
-        styles: {
-            fontSize: 8,
-            valign: 'middle'
-        },
-        columnStyles: {
-            0: { halign: 'center', fontStyle: 'bold', width: 18 },
-            1: { halign: 'center', fontStyle: 'bold', width: 22 },
-            2: { width: 110 },
-            3: { halign: 'center', fontStyle: 'bold', textColor: [79, 70, 229], width: 30 }
-        }
-    });
-
-    // Build set of parent IDs that have children to identify grouping rows
-    const parentIdsWithChildren = new Set<string>();
-    allItems.forEach(item => {
-        const idNorma = item.id_norma;
-        if (typeof idNorma === 'string' && idNorma.trim() !== '') {
-            const match = idNorma.trim().match(SUB_ITEM_REGEX);
-            if (match) {
-                parentIdsWithChildren.add(match[1]);
-            }
-        }
-    });
-
-    // --- 2. DETALLE DE CONTROLES NO CUMPLIDOS ---
-    const noCumpleItems: any[] = [];
-    allItems.forEach(item => {
-        const itemId = generateId(item.point);
-        const isParent = typeof item.id_norma === 'string' && parentIdsWithChildren.has(item.id_norma.trim());
-        if (isParent) return; // Skip parent grouping headers
-        if (data.ignoredItems?.[itemId]) return;
-
-        const val = data.checkedItems[itemId];
-        const numericVal = typeof val === 'boolean' ? (val ? 1.0 : 0.0) : (val ?? 0.0);
-
-        // Add to list if compliance status is NO CUMPLE
-        if (numericVal !== 1.0 && numericVal !== 0.5) {
-            const comment = data.justifications?.[itemId] || "";
-            const evidence = data.evidenceLinks?.[itemId] || "";
-            
-            let commentAndEvidence = "";
-            if (comment) {
-                commentAndEvidence += `Comentario: ${comment}`;
-            }
-            if (evidence) {
-                if (commentAndEvidence) commentAndEvidence += "\n";
-                commentAndEvidence += `Evidencia: ${evidence}`;
-            }
-            if (!commentAndEvidence) {
-                commentAndEvidence = "-";
-            }
-
-            noCumpleItems.push([
-                item.id_norma || '-',
-                clean(item.point),
-                'NO CUMPLE',
-                clean(commentAndEvidence)
-            ]);
-        }
-    });
-
-    if (noCumpleItems.length > 0) {
-        doc.addPage();
-
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(11);
-        doc.setTextColor(194, 65, 12); // Naranja para advertencias de no cumplimiento
-        doc.text("2. DETALLE DE CONTROLES NO CUMPLIDOS", 14, 44);
-
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(8);
-        doc.setTextColor(100);
-        doc.text("Los siguientes items estan marcados como NO CUMPLE o no estan seleccionados, mostrando su evidencia o anotacion si la tuvieran.", 14, 48.5);
-
-        const alertHead = [['Codigo', 'Control / Pregunta', 'Estado', 'Evidencia / Anotacion']];
-
-        autoTable(doc, {
-            startY: 52,
-            head: alertHead,
-            body: noCumpleItems,
-            theme: 'grid',
-            headStyles: {
-                fillColor: [194, 65, 12],
-                textColor: 255,
-                halign: 'center',
-                fontStyle: 'bold',
-                fontSize: 8.5
-            },
-            styles: {
-                fontSize: 7.5,
-                valign: 'middle'
-            },
-            columnStyles: {
-                0: { halign: 'center', fontStyle: 'bold', width: 22 },
-                1: { width: 83 },
-                2: { halign: 'center', fontStyle: 'bold', textColor: [194, 65, 12], width: 32 },
-                3: { width: 45 }
-            },
-            margin: { top: 44, bottom: 20, left: 14, right: 14 },
-            didDrawPage: (dataDraw: any) => {
-                drawHeader(dataDraw.doc);
-            }
-        });
-    }
-
-    // --- 3. DETALLE DE RESPUESTAS Y EVIDENCIAS DE CONTROL ---
-    doc.addPage();
-
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(11);
-    doc.setTextColor(31, 41, 55);
-    doc.text("3. DETALLE DE RESPUESTAS Y EVIDENCIAS DE CONTROL", 14, 44);
-
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(8);
-    doc.setTextColor(100);
-    doc.text("A continuacion se presenta el listado completo de los controles evaluados, su estado de cumplimiento y comentarios/evidencias.", 14, 48.5);
-
-    const detailedRows = allItems.map(item => {
-        const itemId = generateId(item.point);
-        const idNorma = item.id_norma || '-';
-        const isParent = typeof item.id_norma === 'string' && parentIdsWithChildren.has(item.id_norma.trim());
-        
-        let statusText = "-";
-        if (!isParent) {
-            const isIgnored = data.ignoredItems?.[itemId];
-            const val = data.checkedItems[itemId];
-            const numericVal = typeof val === 'boolean' ? (val ? 1.0 : 0.0) : (val ?? 0.0);
-            
-            if (isIgnored) {
-                statusText = "N/A - NO APLICA";
-            } else if (numericVal === 1.0) {
-                statusText = "CUMPLE";
-            } else if (numericVal === 0.5) {
-                const partialVal = data.progresoParcialDecimal?.[itemId];
-                if (partialVal !== undefined && partialVal !== null) {
-                    statusText = `PARCIAL (${Math.round(partialVal * 100)}%)`;
-                } else {
-                    statusText = "PARCIAL";
-                }
-            } else {
-                statusText = "NO CUMPLE";
-            }
-        }
-
-        const comment = data.justifications?.[itemId] || "";
-        const evidence = getItemLink(item);
-        
-        let commentAndEvidence = "";
-        if (comment) {
-            commentAndEvidence += `Comentario: ${comment}`;
-        }
-        if (evidence) {
-            if (commentAndEvidence) commentAndEvidence += "\n";
-            commentAndEvidence += `Evidencia: ${evidence}`;
-        }
-        if (!commentAndEvidence) {
-            commentAndEvidence = "-";
-        }
-
-        return [
-            idNorma,
-            clean(item.point),
-            statusText,
-            clean(commentAndEvidence)
-        ];
-    });
-
-    const detailedHead = [['Codigo', 'Control / Pregunta', 'Estado', 'Evidencia / Comentario']];
-
-    autoTable(doc, {
-        startY: 52,
-        head: detailedHead,
-        body: detailedRows,
-        theme: 'grid',
-        headStyles: {
-            fillColor: [31, 41, 55],
-            textColor: 255,
-            halign: 'center',
-            fontStyle: 'bold',
-            fontSize: 8.5
-        },
-        styles: {
-            fontSize: 7.5,
-            valign: 'middle'
-        },
-        columnStyles: {
-            0: { halign: 'center', fontStyle: 'bold', width: 22 },
-            1: { width: 83 },
-            2: { halign: 'center', fontStyle: 'bold', width: 32 },
-            3: { width: 45 }
+            0: { fontStyle: 'bold', halign: 'center', width: 25 },
+            1: { width: 135 },
+            2: { halign: 'center', fontStyle: 'bold', textColor: [0, 120, 200], width: 30 }
         },
         margin: { top: 44, bottom: 20, left: 14, right: 14 },
+        didParseCell: (dataCell: any) => {
+            if (categoryHeaderRowIndices.includes(dataCell.row.index)) {
+                dataCell.cell.styles.fillColor = [229, 231, 235]; // Light gray background
+                dataCell.cell.styles.fontStyle = 'bold';
+                dataCell.cell.styles.textColor = [31, 41, 55];
+            }
+        },
         didDrawPage: (dataDraw: any) => {
             drawHeader(dataDraw.doc);
         }
